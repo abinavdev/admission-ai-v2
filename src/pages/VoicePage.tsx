@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Phone, PhoneCall, PhoneOff, Clock, Users, TrendingUp,
-  Activity, Mic, Database, Bot, ChevronRight, Play,
+  Phone, PhoneCall, Clock, Users, TrendingUp,
+  Activity, Mic, Database, Bot, Play,
   CheckCircle, ArrowRight,
 } from 'lucide-react';
-import { callLogs } from '../data/mockData';
+import { useCalls } from '../hooks/useCalls';
+import { CallLog } from '../types';
 import { Modal } from '../components/ui/Modal';
 import { CallStatusBadge } from '../components/ui/Badge';
 
@@ -18,7 +19,20 @@ const workflowSteps = [
 ];
 
 export function VoicePage() {
-  const [selectedCall, setSelectedCall] = useState<typeof callLogs[0] | null>(null);
+  const [selectedCall, setSelectedCall] = useState<CallLog | null>(null);
+  const { calls: rawCalls, fetchCalls } = useCalls();
+
+  useEffect(() => { fetchCalls().catch(() => {}); }, [fetchCalls]);
+
+  const callLogs: CallLog[] = (rawCalls as unknown as Record<string, unknown>[]).map((c) => ({
+    id: String(c.id),
+    studentName: String(c.studentName ?? c.student_name ?? ''),
+    phone: String(c.phone ?? ''),
+    duration: String(c.duration ?? '0:00'),
+    status: (String(c.status) === 'COMPLETED' ? 'Completed' : String(c.status) === 'MISSED' ? 'Missed' : 'Voicemail') as CallLog['status'],
+    date: c.calledAt ? new Date(String(c.calledAt)).toLocaleString() : String(c.date ?? ''),
+    transcript: String(c.transcript ?? ''),
+  }));
 
   const completedCalls = callLogs.filter((c) => c.status === 'Completed').length;
   const totalCalls = callLogs.length;

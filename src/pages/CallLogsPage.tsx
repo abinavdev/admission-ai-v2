@@ -1,23 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Clock, Play, Bot } from 'lucide-react';
-import { callLogs as mockCallLogs } from '../data/mockData';
+import { CallLog } from '../types';
+import { useCalls } from '../hooks/useCalls';
+import { useToast } from '../contexts/ToastContext';
 import { TableWrapper, DataTable } from '../components/ui/Table';
 import { CallStatusBadge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
-import { CallLog } from '../types';
-import { useCalls } from '../hooks/useCalls';
+import { TableRowSkeleton, Skeleton } from '../components/ui/Skeleton';
 
 const statusOptions = ['All', 'Completed', 'Missed', 'Voicemail'];
+
+function normalizeCall(c: Record<string, unknown>): CallLog {
+  const status = String(c.status ?? '');
+  return {
+    id: String(c.id),
+    studentName: String(c.studentName ?? c.student_name ?? ''),
+    phone: String(c.phone ?? ''),
+    duration: String(c.duration ?? '0:00'),
+    status: (status === 'COMPLETED' ? 'Completed' : status === 'MISSED' ? 'Missed' : status === 'VOICEMAIL' ? 'Voicemail' : status) as CallLog['status'],
+    date: c.calledAt ? new Date(String(c.calledAt)).toLocaleString() : String(c.date ?? ''),
+    transcript: String(c.transcript ?? ''),
+  };
+}
 
 export function CallLogsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [selected, setSelected] = useState<CallLog | null>(null);
-  const { calls: apiCalls, fetchCalls } = useCalls();
+  const { calls: rawCalls, loading, error, fetchCalls } = useCalls();
+  const toast = useToast();
 
-  useEffect(() => { fetchCalls().catch(() => {}); }, [fetchCalls]);
+  useEffect(() => { fetchCalls(); }, [fetchCalls]);
 
-  const callLogs = apiCalls.length > 0 ? apiCalls : mockCallLogs;
+  useEffect(() => {
+    if (error) toast(error, 'error');
+  }, [error]);
+
+  const callLogs = (rawCalls as unknown as Record<string, unknown>[]).map(normalizeCall);
 
   const filtered = callLogs.filter((c) => {
     const matchSearch = !search || c.studentName.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
@@ -26,7 +45,7 @@ export function CallLogsPage() {
   });
 
   const columns = [
-    { key: 'id', header: 'Call ID', render: (row: CallLog) => <span className="text-xs font-mono text-slate-400">{row.id}</span> },
+    { key: 'id', header: 'Call ID', render: (row: CallLog) => <span className="text-xs font-mono text-slate-400">{row.id.slice(0, 8)}...</span> },
     {
       key: 'student', header: 'Student',
       render: (row: CallLog) => (
@@ -50,10 +69,7 @@ export function CallLogsPage() {
     {
       key: 'transcript', header: 'Transcript',
       render: (row: CallLog) => (
-        <button
-          onClick={() => setSelected(row)}
-          className="flex items-center gap-1 text-xs text-[#003B7A] hover:underline font-medium"
-        >
+        <button onClick={() => setSelected(row)} className="flex items-center gap-1 text-xs text-[#003B7A] hover:underline font-medium">
           <Play className="w-3 h-3" />
           View
         </button>
@@ -65,16 +81,20 @@ export function CallLogsPage() {
     <div className="space-y-5">
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Total Calls', value: callLogs.length, color: 'text-[#003B7A] bg-blue-50' },
-          { label: 'Completed', value: callLogs.filter((c) => c.status === 'Completed').length, color: 'text-emerald-700 bg-emerald-50' },
-          { label: 'Missed', value: callLogs.filter((c) => c.status !== 'Completed').length, color: 'text-red-600 bg-red-50' },
-        ].map((stat) => (
-          <div key={stat.label} className={`card p-4 text-center ${stat.color}`}>
-            <div className="text-2xl font-bold">{stat.value}</div>
-            <div className="text-xs font-medium mt-1">{stat.label}</div>
-          </div>
-        ))}
+        {loading && callLogs.length === 0 ? (
+          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
+        ) : (
+          [
+            { label: 'Total Calls', value: callLogs.length, color: 'text-[#003B7A] bg-blue-50' },
+            { label: 'Completed', value: callLogs.filter((c) => c.status === 'Completed').length, color: 'text-emerald-700 bg-emerald-50' },
+            { label: 'Missed', value: callLogs.filter((c) => c.status !== 'Completed').length, color: 'text-red-600 bg-red-50' },
+          ].map((stat) => (
+            <div key={stat.label} className={`card p-4 text-center ${stat.color}`}>
+              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-xs font-medium mt-1">{stat.label}</div>
+            </div>
+          ))
+        )}
       </div>
 
       <TableWrapper
@@ -93,7 +113,13 @@ export function CallLogsPage() {
           </select>
         }
       >
-        <DataTable columns={columns} data={filtered} />
+        {loading && callLogs.length === 0 ? (
+          <table className="w-full">
+            <tbody>{Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} cols={6} />)}</tbody>
+          </table>
+        ) : (
+          <DataTable columns={columns} data={filtered} emptyMessage="No call logs found" />
+        )}
       </TableWrapper>
 
       <Modal isOpen={!!selected} onClose={() => setSelected(null)} title={`Transcript — ${selected?.studentName}`} size="lg">
@@ -113,25 +139,29 @@ export function CallLogsPage() {
             </div>
             <div className="bg-slate-50 rounded-xl p-4">
               <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Transcript</h4>
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {selected.transcript.split('\n').filter(Boolean).map((line, i) => {
-                  const isAI = line.startsWith('AI:');
-                  const isStudent = line.startsWith('Student:');
-                  const content = line.replace(/^(AI:|Student:)\s*/, '');
-                  return (
-                    <div key={i} className={`flex gap-2 ${isStudent ? 'justify-end' : ''}`}>
-                      {isAI && (
-                        <div className="w-5 h-5 rounded-full bg-[#003B7A] flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <Bot className="w-2.5 h-2.5 text-white" />
+              {selected.transcript ? (
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {selected.transcript.split('\n').filter(Boolean).map((line, i) => {
+                    const isAI = line.startsWith('AI:');
+                    const isStudent = line.startsWith('Student:');
+                    const content = line.replace(/^(AI:|Student:)\s*/, '');
+                    return (
+                      <div key={i} className={`flex gap-2 ${isStudent ? 'justify-end' : ''}`}>
+                        {isAI && (
+                          <div className="w-5 h-5 rounded-full bg-[#003B7A] flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Bot className="w-2.5 h-2.5 text-white" />
+                          </div>
+                        )}
+                        <div className={`max-w-[80%] rounded-lg px-3 py-2 text-xs leading-relaxed ${isAI ? 'bg-white border border-slate-200 text-slate-700' : isStudent ? 'bg-[#003B7A] text-white' : 'text-slate-500 italic'}`}>
+                          {isAI || isStudent ? content : line}
                         </div>
-                      )}
-                      <div className={`max-w-[80%] rounded-lg px-3 py-2 text-xs leading-relaxed ${isAI ? 'bg-white border border-slate-200 text-slate-700' : isStudent ? 'bg-[#003B7A] text-white' : 'text-slate-500 italic'}`}>
-                        {isAI || isStudent ? content : line}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 italic">No transcript available</p>
+              )}
             </div>
           </div>
         )}

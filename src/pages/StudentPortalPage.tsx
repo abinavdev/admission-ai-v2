@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
-  GraduationCap, MessageSquare, Bot, User, Send, ChevronRight,
-  Phone, BookOpen, Users, Award, Sparkles, X, Check,
-  ArrowRight, Database, AlertCircle, ExternalLink,
+  GraduationCap, Bot, User, Send, ChevronRight,
+  Users, Sparkles, X, Check,
+  Database, AlertCircle, ExternalLink,
 } from 'lucide-react';
 import { Page } from '../types';
 

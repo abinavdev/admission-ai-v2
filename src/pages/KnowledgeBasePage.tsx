@@ -1,88 +1,111 @@
 import React, { useState, useEffect } from 'react';
 import {
   Upload, FileText, Check, Clock, Trash2, RefreshCw,
-  Database, Zap, AlertCircle,
+  Database, Zap,
 } from 'lucide-react';
-import { documents as mockDocuments } from '../data/mockData';
 import { Document } from '../types';
 import { DocStatusBadge } from '../components/ui/Badge';
 import { useDocuments } from '../hooks/useDocuments';
+import { useToast } from '../contexts/ToastContext';
+import { Skeleton } from '../components/ui/Skeleton';
+
+function normalizeDoc(d: Record<string, unknown>): Document {
+  const status = String(d.status ?? '');
+  const normalStatus = status === 'PROCESSED' ? 'Processed' : status === 'PROCESSING' ? 'Processing' : status === 'FAILED' ? 'Queued' : 'Queued';
+  const sizeBytes = Number(d.size ?? 0);
+  const sizeMB = sizeBytes > 0 ? `${(sizeBytes / 1048576).toFixed(1)} MB` : String(d.size ?? '—');
+  return {
+    id: String(d.id),
+    name: String(d.name ?? ''),
+    size: sizeMB,
+    status: normalStatus as Document['status'],
+    uploadDate: d.uploadedAt ? new Date(String(d.uploadedAt)).toLocaleDateString() : String(d.uploadDate ?? ''),
+    type: String(d.mimeType ?? d.type ?? 'pdf').includes('pdf') ? 'pdf' : 'doc',
+  };
+}
 
 export function KnowledgeBasePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const { documents: apiDocs, fetchDocuments, deleteDocument } = useDocuments();
-  const [localDocs, setLocalDocs] = useState<Document[]>(mockDocuments);
+  const { documents: rawDocs, loading, error, fetchDocuments, uploadDocument, deleteDocument } = useDocuments();
+  const toast = useToast();
 
-  useEffect(() => { fetchDocuments().catch(() => {}); }, [fetchDocuments]);
+  useEffect(() => { fetchDocuments(); }, [fetchDocuments]);
 
-  const docs = apiDocs.length > 0 ? apiDocs : localDocs;
+  useEffect(() => {
+    if (error) toast(error, 'error');
+  }, [error]);
 
+  const docs = (rawDocs as unknown as Record<string, unknown>[]).map(normalizeDoc);
   const processedCount = docs.filter((d) => d.status === 'Processed').length;
 
-  const simulateUpload = (name: string) => {
+  const handleFileUpload = async (file: File) => {
     setUploading(true);
     setUploadProgress(0);
     const interval = setInterval(() => {
       setUploadProgress((p) => {
-        if (p >= 100) {
-          clearInterval(interval);
-          setUploading(false);
-          const newDoc: Document = {
-            id: `D${Date.now()}`,
-            name,
-            size: `${(Math.random() * 4 + 0.5).toFixed(1)} MB`,
-            status: 'Processing',
-            uploadDate: new Date().toISOString().split('T')[0],
-            type: 'pdf',
-          };
-          setLocalDocs((prev) => [newDoc, ...prev]);
-          setTimeout(() => {
-            setLocalDocs((prev) => prev.map((d) => d.id === newDoc.id ? { ...d, status: 'Processed' as const } : d));
-          }, 3000);
-          return 0;
-        }
-        return p + 10;
+        if (p >= 90) { clearInterval(interval); return 90; }
+        return p + 15;
       });
-    }, 200);
+    }, 150);
+    try {
+      await uploadDocument(file);
+      clearInterval(interval);
+      setUploadProgress(100);
+      toast(`${file.name} uploaded successfully`, 'success');
+      await fetchDocuments();
+    } catch {
+      clearInterval(interval);
+      toast('Failed to upload file', 'error');
+    } finally {
+      setTimeout(() => { setUploading(false); setUploadProgress(0); }, 600);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) simulateUpload(files[0].name);
+    if (files.length > 0) handleFileUpload(files[0]);
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0) simulateUpload(files[0].name);
+    if (files && files.length > 0) handleFileUpload(files[0]);
   };
 
-  const removeDoc = (id: string) => {
-    deleteDocument(id).catch(() => {});
-    setLocalDocs((prev) => prev.filter((d) => d.id !== id));
+  const handleDelete = async (id: string, name: string) => {
+    try {
+      await deleteDocument(id);
+      toast(`${name} deleted`, 'success');
+    } catch {
+      toast('Failed to delete document', 'error');
+    }
   };
 
   return (
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Documents', value: docs.length, icon: <FileText className="w-5 h-5 text-[#003B7A]" />, bg: 'bg-blue-50' },
-          { label: 'Processed', value: processedCount, icon: <Check className="w-5 h-5 text-emerald-600" />, bg: 'bg-emerald-50' },
-          { label: 'Processing', value: docs.filter((d) => d.status === 'Processing').length, icon: <Clock className="w-5 h-5 text-amber-600" />, bg: 'bg-amber-50' },
-          { label: 'AI Ready', value: `${Math.round((processedCount / docs.length) * 100)}%`, icon: <Zap className="w-5 h-5 text-purple-600" />, bg: 'bg-purple-50' },
-        ].map((stat) => (
-          <div key={stat.label} className="card p-4 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center flex-shrink-0`}>{stat.icon}</div>
-            <div>
-              <p className="text-lg font-bold text-slate-900">{stat.value}</p>
-              <p className="text-xs text-slate-500">{stat.label}</p>
+        {loading && docs.length === 0 ? (
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
+        ) : (
+          [
+            { label: 'Total Documents', value: docs.length, icon: <FileText className="w-5 h-5 text-[#003B7A]" />, bg: 'bg-blue-50' },
+            { label: 'Processed', value: processedCount, icon: <Check className="w-5 h-5 text-emerald-600" />, bg: 'bg-emerald-50' },
+            { label: 'Processing', value: docs.filter((d) => d.status === 'Processing').length, icon: <Clock className="w-5 h-5 text-amber-600" />, bg: 'bg-amber-50' },
+            { label: 'AI Ready', value: docs.length > 0 ? `${Math.round((processedCount / docs.length) * 100)}%` : '0%', icon: <Zap className="w-5 h-5 text-purple-600" />, bg: 'bg-purple-50' },
+          ].map((stat) => (
+            <div key={stat.label} className="card p-4 flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl ${stat.bg} flex items-center justify-center flex-shrink-0`}>{stat.icon}</div>
+              <div>
+                <p className="text-lg font-bold text-slate-900">{stat.value}</p>
+                <p className="text-xs text-slate-500">{stat.label}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -124,8 +147,7 @@ export function KnowledgeBasePage() {
             </div>
             <div className="space-y-2.5">
               {[
-                { label: 'Total Pages Indexed', value: '2,847' },
-                { label: 'Last Updated', value: 'Jan 20, 2024' },
+                { label: 'Total Docs Indexed', value: processedCount },
                 { label: 'AI Model', value: 'GPT-4 + RAG' },
                 { label: 'Languages', value: 'English, Hindi' },
               ].map((item) => (
@@ -147,38 +169,57 @@ export function KnowledgeBasePage() {
           <div className="px-5 py-4 border-b border-slate-100">
             <h3 className="font-semibold text-slate-900 text-sm">Uploaded Documents</h3>
           </div>
-          <div className="divide-y divide-slate-50">
-            {docs.map((doc) => (
-              <div key={doc.id} className="px-5 py-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-5 h-5 text-red-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{doc.name}</p>
-                  <div className="flex items-center gap-3 mt-1">
-                    <span className="text-xs text-slate-400">{doc.size}</span>
-                    <span className="text-xs text-slate-300">·</span>
-                    <span className="text-xs text-slate-400">{doc.uploadDate}</span>
-                    {doc.status === 'Processing' && (
-                      <div className="flex items-center gap-1">
-                        <RefreshCw className="w-3 h-3 text-amber-500 animate-spin" />
-                        <span className="text-xs text-amber-600">Processing...</span>
-                      </div>
-                    )}
+          {loading && docs.length === 0 ? (
+            <div className="divide-y divide-slate-50">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="px-5 py-4 flex items-center gap-4">
+                  <Skeleton className="w-10 h-10 rounded-xl flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-32" />
                   </div>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <DocStatusBadge status={doc.status} />
-                  <button
-                    onClick={() => removeDoc(doc.id)}
-                    className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-slate-300 hover:text-red-500"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+              ))}
+            </div>
+          ) : docs.length === 0 ? (
+            <div className="px-5 py-12 text-center">
+              <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-xs text-slate-400">No documents uploaded yet. Upload your first document above.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-50">
+              {docs.map((doc) => (
+                <div key={doc.id} className="px-5 py-4 flex items-center gap-4 hover:bg-slate-50 transition-colors">
+                  <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-5 h-5 text-red-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">{doc.name}</p>
+                    <div className="flex items-center gap-3 mt-1">
+                      <span className="text-xs text-slate-400">{doc.size}</span>
+                      <span className="text-xs text-slate-300">·</span>
+                      <span className="text-xs text-slate-400">{doc.uploadDate}</span>
+                      {doc.status === 'Processing' && (
+                        <div className="flex items-center gap-1">
+                          <RefreshCw className="w-3 h-3 text-amber-500 animate-spin" />
+                          <span className="text-xs text-amber-600">Processing...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <DocStatusBadge status={doc.status} />
+                    <button
+                      onClick={() => handleDelete(doc.id, doc.name)}
+                      className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-slate-300 hover:text-red-500"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {processedCount > 0 && (
             <div className="px-5 py-3 bg-emerald-50 border-t border-emerald-100 flex items-center gap-2">

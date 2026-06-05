@@ -1,4 +1,3 @@
-import React from 'react';
 import { Menu, Bell, Search, ChevronRight } from 'lucide-react';
 import { Page } from '../../types';
 

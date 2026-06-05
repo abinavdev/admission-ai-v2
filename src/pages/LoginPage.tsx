@@ -1,25 +1,33 @@
 import React, { useState } from 'react';
 import { GraduationCap, Eye, EyeOff, ArrowRight, Lock, Mail, Shield } from 'lucide-react';
 import { Page } from '../types';
+import { useAuthContext } from '../contexts/AuthContext';
 
 interface LoginPageProps {
   onNavigate: (page: Page) => void;
 }
 
 export function LoginPage({ onNavigate }: LoginPageProps) {
+  const { login } = useAuthContext();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('admin@admissionai.in');
   const [password, setPassword] = useState('password');
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setError('');
+    try {
+      await login(email, password);
       onNavigate('dashboard');
-    }, 1200);
+    } catch {
+      setError('Invalid email or password. Use demo credentials below.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -46,6 +54,11 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
 
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-8">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-lg">
+              <p className="text-xs text-red-600 font-medium">{error}</p>
+            </div>
+          )}
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1.5">Email Address</label>

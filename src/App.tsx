@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Page } from './types';
+import { AuthProvider, useAuthContext } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardLayout } from './components/layout/DashboardLayout';
@@ -21,7 +23,8 @@ const dashboardPages: Page[] = [
   'chat-history', 'knowledge-base', 'analytics', 'settings', 'ai-agent', 'team',
 ];
 
-function App() {
+function AppRoutes() {
+  const { isAuthenticated } = useAuthContext();
   const [currentPage, setCurrentPage] = useState<Page>('landing');
 
   const navigate = (page: Page) => setCurrentPage(page);
@@ -31,6 +34,7 @@ function App() {
   if (currentPage === 'student-portal') return <StudentPortalPage onNavigate={navigate} />;
 
   if (dashboardPages.includes(currentPage)) {
+    if (!isAuthenticated) return <LoginPage onNavigate={navigate} />;
     return (
       <DashboardLayout currentPage={currentPage} onNavigate={navigate}>
         {currentPage === 'dashboard' && <DashboardPage />}
@@ -49,6 +53,16 @@ function App() {
   }
 
   return <LandingPage onNavigate={navigate} />;
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <ToastProvider>
+        <AppRoutes />
+      </ToastProvider>
+    </AuthProvider>
+  );
 }
 
 export default App;

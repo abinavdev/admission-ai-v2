@@ -1,14 +1,13 @@
-import React from 'react';
+import { useEffect } from 'react';
 import {
-  Phone, MessageSquare, Users, TrendingUp, BarChart3,
+  Phone, MessageSquare, Users, TrendingUp,
 } from 'lucide-react';
-import {
-  dailyCallsData, dailyChatsData, courseInterestData,
-  leadsTimelineData, conversionFunnelData,
-} from '../data/mockData';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { StatCardSkeleton, Skeleton } from '../components/ui/Skeleton';
+import { dailyCallsData, dailyChatsData, leadsTimelineData } from '../data/chartData';
 
-function BarChart({ data, dataKey, color, label }: { data: any[]; dataKey: string; color: string; label: string }) {
-  const max = Math.max(...data.map((d) => d[dataKey]));
+function BarChart({ data, dataKey, color, label }: { data: Record<string, unknown>[]; dataKey: string; color: string; label: string }) {
+  const max = Math.max(...data.map((d) => Number(d[dataKey])));
   return (
     <div className="card p-5">
       <div className="flex items-center justify-between mb-4">
@@ -17,12 +16,12 @@ function BarChart({ data, dataKey, color, label }: { data: any[]; dataKey: strin
       <div className="flex items-end gap-2 h-36">
         {data.map((d, i) => (
           <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-            <span className="text-xs text-slate-500">{d[dataKey]}</span>
+            <span className="text-xs text-slate-500">{Number(d[dataKey])}</span>
             <div
               className="w-full rounded-t-md transition-all duration-500 cursor-pointer hover:opacity-80"
-              style={{ height: `${Math.max((d[dataKey] / max) * 100, 8)}%`, backgroundColor: color }}
+              style={{ height: `${Math.max((Number(d[dataKey]) / max) * 100, 8)}%`, backgroundColor: color }}
             />
-            <span className="text-xs text-slate-400 truncate w-full text-center">{d.day || d.month}</span>
+            <span className="text-xs text-slate-400 truncate w-full text-center">{String(d.day || d.month)}</span>
           </div>
         ))}
       </div>
@@ -31,7 +30,7 @@ function BarChart({ data, dataKey, color, label }: { data: any[]; dataKey: strin
 }
 
 function HorizontalBar({ label, count, total, color }: { label: string; count: number; total: number; color: string }) {
-  const pct = Math.round((count / total) * 100);
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
@@ -48,31 +47,53 @@ function HorizontalBar({ label, count, total, color }: { label: string; count: n
   );
 }
 
+const courseColors = ['#003B7A', '#F4B400', '#0ea5e9', '#22c55e', '#f59e0b', '#8b5cf6', '#94a3b8'];
+
 export function AnalyticsPage() {
-  const totalEnquiries = conversionFunnelData[0].count;
+  const { analytics, loading, fetchAnalytics } = useAnalytics();
+
+  useEffect(() => { fetchAnalytics().catch(() => {}); }, [fetchAnalytics]);
+
+  const overview = analytics?.overview;
+  const leadsByStatus = analytics?.leadsByStatus ?? [];
+  const leadsByCourse = analytics?.leadsByCourse ?? [];
+
+  const totalEnquiries = leadsByStatus.reduce((sum, s) => sum + s._count._all, 0);
+  const contactedCount = leadsByStatus.find((s) => s.status === 'CONTACTED')?._count._all ?? 0;
+  const interestedCount = leadsByStatus.find((s) => s.status === 'INTERESTED')?._count._all ?? 0;
+  const followUpCount = leadsByStatus.find((s) => s.status === 'FOLLOW_UP')?._count._all ?? 0;
+  const convertedCount = leadsByStatus.find((s) => s.status === 'CONVERTED')?._count._all ?? 0;
+
+  const conversionRate = overview?.conversionRate ?? 0;
 
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Calls (Month)', value: '12,847', change: '+12.4%', icon: <Phone className="w-5 h-5 text-[#003B7A]" />, bg: 'bg-blue-50', changeColor: 'text-emerald-600' },
-          { label: 'Total Chats (Month)', value: '48,392', change: '+8.1%', icon: <MessageSquare className="w-5 h-5 text-emerald-600" />, bg: 'bg-emerald-50', changeColor: 'text-emerald-600' },
-          { label: 'Leads Generated', value: '7,214', change: '+15.3%', icon: <Users className="w-5 h-5 text-amber-600" />, bg: 'bg-amber-50', changeColor: 'text-emerald-600' },
-          { label: 'Conversion Rate', value: '18.6%', change: '+2.1%', icon: <TrendingUp className="w-5 h-5 text-purple-600" />, bg: 'bg-purple-50', changeColor: 'text-emerald-600' },
-        ].map((stat) => (
-          <div key={stat.label} className="card p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs text-slate-500 font-medium">{stat.label}</p>
-                <p className="text-2xl font-bold text-slate-900 mt-1">{stat.value}</p>
-                <p className={`text-xs font-medium mt-1 ${stat.changeColor}`}>{stat.change} vs last month</p>
+      {loading && !overview ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Calls', value: (overview?.totalCalls ?? 0).toLocaleString(), change: '+12.4%', icon: <Phone className="w-5 h-5 text-[#003B7A]" />, bg: 'bg-blue-50' },
+            { label: 'Total Chats', value: (overview?.totalChats ?? 0).toLocaleString(), change: '+8.1%', icon: <MessageSquare className="w-5 h-5 text-emerald-600" />, bg: 'bg-emerald-50' },
+            { label: 'Leads Generated', value: (overview?.totalLeads ?? 0).toLocaleString(), change: '+15.3%', icon: <Users className="w-5 h-5 text-amber-600" />, bg: 'bg-amber-50' },
+            { label: 'Conversion Rate', value: `${conversionRate}%`, change: '+2.1%', icon: <TrendingUp className="w-5 h-5 text-purple-600" />, bg: 'bg-purple-50' },
+          ].map((stat) => (
+            <div key={stat.label} className="card p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-slate-500 font-medium">{stat.label}</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{stat.value}</p>
+                  <p className="text-xs font-medium mt-1 text-emerald-600">{stat.change} vs last month</p>
+                </div>
+                <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center`}>{stat.icon}</div>
               </div>
-              <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center`}>{stat.icon}</div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Bar Charts */}
       <div className="grid lg:grid-cols-2 gap-4">
@@ -84,43 +105,62 @@ export function AnalyticsPage() {
       <div className="grid lg:grid-cols-2 gap-4">
         <BarChart data={leadsTimelineData} dataKey="leads" color="#F4B400" label="Lead Generation (Last 6 Months)" />
 
-        {/* Conversion Funnel */}
+        {/* Conversion Funnel from API */}
         <div className="card p-5">
           <h3 className="font-semibold text-slate-900 text-sm mb-5">Lead Conversion Funnel</h3>
-          <div className="space-y-4">
-            {conversionFunnelData.map((item) => (
-              <HorizontalBar key={item.stage} label={item.stage} count={item.count} total={totalEnquiries} color={item.color} />
-            ))}
-          </div>
-          <div className="mt-4 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-            <p className="text-xs text-emerald-700 font-medium">Overall conversion rate: <span className="text-base font-bold">{Math.round((conversionFunnelData[4].count / totalEnquiries) * 100)}%</span></p>
-          </div>
+          {loading && totalEnquiries === 0 ? (
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4">
+                <HorizontalBar label="Total Enquiries" count={totalEnquiries} total={totalEnquiries || 1} color="#003B7A" />
+                <HorizontalBar label="Contacted" count={contactedCount} total={totalEnquiries || 1} color="#0369a1" />
+                <HorizontalBar label="Interested" count={interestedCount} total={totalEnquiries || 1} color="#0ea5e9" />
+                <HorizontalBar label="Follow-Up" count={followUpCount} total={totalEnquiries || 1} color="#F4B400" />
+                <HorizontalBar label="Converted" count={convertedCount} total={totalEnquiries || 1} color="#22c55e" />
+              </div>
+              <div className="mt-4 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                <p className="text-xs text-emerald-700 font-medium">
+                  Overall conversion rate: <span className="text-base font-bold">{conversionRate}%</span>
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Course Interest + Student trends */}
+      {/* Course Interest from API + trends */}
       <div className="grid lg:grid-cols-2 gap-4">
-        {/* Course Interest */}
         <div className="card p-5">
           <h3 className="font-semibold text-slate-900 text-sm mb-5">Popular Courses by Interest</h3>
-          <div className="space-y-3">
-            {courseInterestData.map((item) => {
-              const total = courseInterestData.reduce((a, b) => a + b.count, 0);
-              return (
-                <div key={item.course} className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="text-xs text-slate-600 flex-1">{item.course}</span>
-                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${(item.count / total) * 100}%`, backgroundColor: item.color }} />
+          {loading && leadsByCourse.length === 0 ? (
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}
+            </div>
+          ) : leadsByCourse.length === 0 ? (
+            <p className="text-xs text-slate-400 text-center py-8">No leads data yet</p>
+          ) : (
+            <div className="space-y-3">
+              {leadsByCourse.map((item, idx) => {
+                const total = leadsByCourse.reduce((a, b) => a + b._count._all, 0);
+                return (
+                  <div key={item.course} className="flex items-center gap-3">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: courseColors[idx % courseColors.length] }} />
+                    <span className="text-xs text-slate-600 flex-1 truncate">{item.course}</span>
+                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${(item._count._all / total) * 100}%`, backgroundColor: courseColors[idx % courseColors.length] }} />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700 w-8 text-right">{item._count._all}</span>
                   </div>
-                  <span className="text-xs font-semibold text-slate-700 w-8 text-right">{item.count}</span>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Student Interest Trends */}
+        {/* Student Interest Trends - static context */}
         <div className="card p-5">
           <h3 className="font-semibold text-slate-900 text-sm mb-5">Student Interest Trends</h3>
           <div className="space-y-3">
@@ -142,7 +182,6 @@ export function AnalyticsPage() {
               </div>
             ))}
           </div>
-
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div className="text-center p-3 bg-blue-50 rounded-xl">
               <p className="text-lg font-bold text-[#003B7A]">Tue-Thu</p>

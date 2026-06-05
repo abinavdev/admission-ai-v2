@@ -1,7 +1,6 @@
-import React from 'react';
 import {
   Bot, Phone, Mic, Database, Brain, Users, CheckCircle, ArrowDown,
-  Activity, Zap, Shield, TrendingUp, Clock, PhoneCall,
+  Activity, Zap, Shield, TrendingUp,
 } from 'lucide-react';
 
 const workflowSteps = [
@@ -53,13 +52,6 @@ const workflowSteps = [
     lightBg: 'bg-emerald-50',
     textColor: 'text-emerald-600',
   },
-];
-
-const metrics = [
-  { label: 'Active Agent', value: 'Voice + Chat', status: 'Active', color: 'text-emerald-600' },
-  { label: 'Knowledge Base', value: '5 Documents', status: 'Ready', color: 'text-emerald-600' },
-  { label: 'Lead Capture', value: 'Enabled', status: 'Active', color: 'text-emerald-600' },
-  { label: 'Avg Response', value: '0.8 sec', status: 'Optimal', color: 'text-emerald-600' },
 ];
 
 export function AIAgentPage() {

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  Building2, Phone, MessageSquare, Bell, Users, Code, Save, Plus, Trash2, Eye, EyeOff,
+  Building2, Phone, MessageSquare, Bell, Users, Code, Save, Eye, EyeOff,
 } from 'lucide-react';
 
 const settingsSections = [

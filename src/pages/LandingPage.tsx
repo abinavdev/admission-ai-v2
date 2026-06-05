@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   GraduationCap, Phone, MessageSquare, BookOpen, Check, Star,
-  ChevronRight, PlayCircle, ArrowRight, Users, Zap, Shield,
+  ArrowRight, Users, Zap, Shield,
   TrendingUp, Clock, Award, Building2, Globe, Menu, X,
-  Mic, Bot, FileText, BarChart3, ChevronDown, AlertCircle,
+  Bot, FileText, BarChart3, ChevronDown, AlertCircle,
 } from 'lucide-react';
 import { Page } from '../types';
 

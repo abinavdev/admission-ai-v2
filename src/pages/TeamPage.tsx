@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   UserPlus, Edit2, Trash2, Shield, Users, UserCheck, Eye,
-  Mail, Clock, X, Save,
+  Mail, Clock, Save,
 } from 'lucide-react';
 import { teamMembers } from '../data/mockData';
 import { TeamMember } from '../types';

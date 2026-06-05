@@ -14,6 +14,7 @@ interface AnalyticsData {
   leadsBySource: { source: string; _count: { _all: number } }[];
   leadsByCourse: { course: string; _count: { _all: number } }[];
   callsByStatus: { status: string; _count: { _all: number } }[];
+  recentLeads: Record<string, unknown>[];
 }
 
 interface UseAnalyticsReturn {
