@@ -1,0 +1,150 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole @default(ADMISSION_OFFICER)
+  status    String   @default("Active")
+  lastLogin DateTime?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chatSessions ChatSession[]
+  leads        Lead[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  ADMISSION_OFFICER
+  VIEWER
+}
+
+model Lead {
+  id        String     @id @default(cuid())
+  name      String
+  phone     String
+  email     String
+  course    String
+  status    LeadStatus @default(NEW)
+  source    LeadSource
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  assignedTo   String?
+  assignedUser User?   @relation(fields: [assignedTo], references: [id])
+
+  @@map("leads")
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  INTERESTED
+  FOLLOW_UP
+  CONVERTED
+}
+
+enum LeadSource {
+  CHAT
+  VOICE
+}
+
+model ChatSession {
+  id             String   @id @default(cuid())
+  studentName    String
+  courseInterest String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  agentId String?
+  agent   User?   @relation(fields: [agentId], references: [id])
+
+  messages ChatMessage[]
+
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  sessionId String
+  role      MessageRole
+  content   String      @db.Text
+  createdAt DateTime    @default(now())
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
+model Document {
+  id         String         @id @default(cuid())
+  name       String
+  size       Int
+  mimeType   String
+  filePath   String
+  status     DocumentStatus @default(QUEUED)
+  uploadedAt DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  chunks DocumentChunk[]
+
+  @@map("documents")
+}
+
+enum DocumentStatus {
+  QUEUED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  documentId String
+  content    String   @db.Text
+  chunkIndex Int
+  createdAt  DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("document_chunks")
+}
+
+model CallLog {
+  id          String     @id @default(cuid())
+  studentName String
+  phone       String
+  duration    String
+  status      CallStatus
+  transcript  String?    @db.Text
+  calledAt    DateTime   @default(now())
+  createdAt   DateTime   @default(now())
+
+  @@map("call_logs")
+}
+
+enum CallStatus {
+  COMPLETED
+  MISSED
+  VOICEMAIL
+}
