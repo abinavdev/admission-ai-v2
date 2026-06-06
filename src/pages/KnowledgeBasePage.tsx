@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Upload, FileText, Check, Clock, Trash2, RefreshCw,
-  Database, Zap,
+  Database, Zap, AlertTriangle, Layers,
 } from 'lucide-react';
 import { Document } from '../types';
 import { DocStatusBadge } from '../components/ui/Badge';
 import { useDocuments } from '../hooks/useDocuments';
 import { useToast } from '../contexts/ToastContext';
 import { Skeleton } from '../components/ui/Skeleton';
+import { apiClient } from '../api/client';
+import { API_ENDPOINTS } from '../api/endpoints';
 
 function normalizeDoc(d: Record<string, unknown>): Document {
   const status = String(d.status ?? '');
@@ -28,10 +30,20 @@ export function KnowledgeBasePage() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [docStats, setDocStats] = useState<{ totalChunks: number; failedCount: number } | null>(null);
   const { documents: rawDocs, loading, error, fetchDocuments, uploadDocument, deleteDocument } = useDocuments();
   const toast = useToast();
 
-  useEffect(() => { fetchDocuments(); }, [fetchDocuments]);
+  const fetchDocStats = useCallback(async () => {
+    try {
+      const res = await apiClient.get<{ data: { totalChunks: number; failedCount: number } }>(API_ENDPOINTS.documents.stats);
+      if (res.data?.data) setDocStats(res.data.data);
+    } catch {
+      // non-critical
+    }
+  }, []);
+
+  useEffect(() => { fetchDocuments(); fetchDocStats(); }, [fetchDocuments, fetchDocStats]);
 
   useEffect(() => {
     if (error) toast(error, 'error');
@@ -55,6 +67,7 @@ export function KnowledgeBasePage() {
       setUploadProgress(100);
       toast(`${file.name} uploaded successfully`, 'success');
       await fetchDocuments();
+      fetchDocStats();
     } catch {
       clearInterval(interval);
       toast('Failed to upload file', 'error');
@@ -87,14 +100,16 @@ export function KnowledgeBasePage() {
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {loading && docs.length === 0 ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
+          Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
         ) : (
           [
             { label: 'Total Documents', value: docs.length, icon: <FileText className="w-5 h-5 text-[#003B7A]" />, bg: 'bg-blue-50' },
             { label: 'Processed', value: processedCount, icon: <Check className="w-5 h-5 text-emerald-600" />, bg: 'bg-emerald-50' },
             { label: 'Processing', value: docs.filter((d) => d.status === 'Processing').length, icon: <Clock className="w-5 h-5 text-amber-600" />, bg: 'bg-amber-50' },
+            { label: 'Failed', value: docStats?.failedCount ?? docs.filter((d) => d.status === 'Queued' && String((d as unknown as Record<string, unknown>).rawStatus) === 'FAILED').length, icon: <AlertTriangle className="w-5 h-5 text-red-500" />, bg: 'bg-red-50' },
+            { label: 'Total Chunks', value: docStats?.totalChunks ?? '—', icon: <Layers className="w-5 h-5 text-indigo-600" />, bg: 'bg-indigo-50' },
             { label: 'AI Ready', value: docs.length > 0 ? `${Math.round((processedCount / docs.length) * 100)}%` : '0%', icon: <Zap className="w-5 h-5 text-purple-600" />, bg: 'bg-purple-50' },
           ].map((stat) => (
             <div key={stat.label} className="card p-4 flex items-center gap-3">
@@ -148,8 +163,8 @@ export function KnowledgeBasePage() {
             <div className="space-y-2.5">
               {[
                 { label: 'Total Docs Indexed', value: processedCount },
-                { label: 'AI Model', value: 'GPT-4 + RAG' },
-                { label: 'Languages', value: 'English, Hindi' },
+                { label: 'Total Chunks', value: docStats?.totalChunks ?? '—' },
+                { label: 'Failed Documents', value: docStats?.failedCount ?? '—' },
               ].map((item) => (
                 <div key={item.label} className="flex items-center justify-between text-xs">
                   <span className="text-slate-500">{item.label}</span>

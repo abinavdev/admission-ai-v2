@@ -9,12 +9,14 @@ export const API_ENDPOINTS = {
     detail: (id: string) => `/leads/${id}`,
   },
   chat: {
+    ask: '/chat/ask',
     sessions: '/chat/sessions',
     session: (id: string) => `/chat/sessions/${id}`,
     messages: (id: string) => `/chat/sessions/${id}/messages`,
   },
   documents: {
     list: '/documents',
+    stats: '/documents/stats',
     detail: (id: string) => `/documents/${id}`,
   },
   calls: {

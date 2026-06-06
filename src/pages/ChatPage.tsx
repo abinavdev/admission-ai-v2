@@ -3,6 +3,8 @@ import {
   Send, Plus, MessageSquare, Bot, User, Database,
   Sparkles, ChevronRight, Search,
 } from 'lucide-react';
+import { apiClient } from '../api/client';
+import { API_ENDPOINTS } from '../api/endpoints';
 
 const suggestedQuestions = [
   'What courses are available?',
@@ -14,28 +16,7 @@ const suggestedQuestions = [
   'What are placement opportunities?',
 ];
 
-const aiResponses: Record<string, string> = {
-  'What courses are available?': "CUSAT offers a wide range of programs across multiple departments:\n\n**Engineering & Technology**\n• B.Tech (CSE, ECE, Mechanical, Civil, Chemical, Polymer Science)\n• M.Tech (Artificial Intelligence, VLSI Design, Marine Technology, Environmental Engineering)\n\n**Science**\n• Integrated M.Sc — 5 years (Physics, Chemistry, Maths, Photonics)\n• M.Sc (Computer Science, Physics, Chemistry, Mathematics, Photonics)\n\n**Management**\n• MBA — Full Time (2 years)\n• BBA (3 years)\n\n**Computer Applications**\n• MCA (3 years)\n\n**Research**\n• Ph.D programs across all departments\n\nWould you like details about any specific program?",
-  'What is the MCA eligibility?': "For MCA at CUSAT:\n\n**Academic Eligibility**\n• Bachelor's degree in any discipline with minimum 50% marks\n• Mathematics as a subject either at degree level or at 10+2 level\n\n**Entrance Requirement**\n• CUSAT CAT (Common Admission Test) — mandatory\n• Entrance exam conducted by CUSAT\n\n**Admission Process**\n• Register and appear for CUSAT CAT\n• Rank-based allotment through centralised counselling\n\n**Program Details**\n• Duration: 3 years (6 semesters)\n• Full-time residential program\n\nShall I tell you about the CAT exam pattern or fee structure?",
-  'What is the fee structure?': "CUSAT fee structure (approximate, subject to revision):\n\n**Engineering (B.Tech)**\n• Government Seats: ~₹25,000/year\n• Self-Financing Seats: Higher fees apply\n\n**MCA**\n• ~₹20,000–₹35,000/year (aided seats)\n\n**MBA**\n• ~₹50,000–₹75,000/year\n\n**M.Tech**\n• GATE scholars receive ₹12,400/month fellowship\n• Non-GATE: ~₹25,000/year\n\n**Hostel**\n• ~₹2,000–₹4,000/month (meals included)\n\nFees are subject to annual revision. Official CUSAT fee notification is released before admissions. Shall I provide scholarship information that can offset fees?",
-  'Are scholarships available?': "Yes! CUSAT students have access to multiple scholarships:\n\n🏆 **Merit-Based**\n• University merit awards for toppers\n• Departmental awards for academic excellence\n\n💰 **Government Scholarships**\n• Kerala State Merit Scholarship\n• Post-Matric Scholarship (SC/ST/OBC categories)\n• Central Sector Scholarship\n• Merit-cum-Means Scholarship\n\n🎯 **Special Awards**\n• GATE Fellowship: ₹12,400/month for M.Tech scholars\n• Physically Challenged student scholarships\n• Sports achievement scholarships\n• Emergency financial assistance from University\n\nEligibility varies by category and academic performance. Shall I connect you with a counsellor for detailed guidance?",
-  'What are the hostel facilities?': "CUSAT provides on-campus hostel facilities:\n\n🏠 **Accommodation**\n• Separate hostels for male and female students\n• Multiple hostels on the main Kalamassery campus\n• ~₹2,000–₹4,000/month including meals\n\n✅ **Facilities**\n• 24-hour internet connectivity\n• Dining hall with nutritious meals\n• Common recreation rooms\n• Sports facilities\n• Medical care & first aid\n• 24-hour security\n• CCTV surveillance\n• Resident warden\n\n📍 **Location**\n• Main campus: Kalamassery, Kochi — a safe, residential university campus\n\nHostel seats are allocated on merit and are limited. Early application is recommended. Shall I register your interest?",
-  'How can I apply to CUSAT?': "Applying to CUSAT involves the CUSAT CAT (Common Admission Test):\n\n**Step-by-Step Process**\n1. Check eligibility for your desired program\n2. Register online at the CUSAT CAT portal during the notification period\n3. Pay the application fee\n4. Download your hall ticket\n5. Appear for CUSAT CAT on the scheduled date\n6. Check your rank on the results portal\n7. Participate in centralised counselling\n8. Report for admission with original documents\n\n**Required Documents**\n• 10th & 12th marksheets\n• Degree certificate (for PG programs)\n• ID proof (Aadhaar/PAN)\n• Community certificate (if applicable)\n• Passport-size photographs\n\nShall I register your interest so a counsellor can guide you through the process?",
-  'What are placement opportunities?': "CUSAT has an active Centre for Career Development & Placement:\n\n🏢 **Major Recruiters (CUSAT Campus)**\n• TCS, Infosys, Wipro, Cognizant\n• UST Global, IBS Software\n• Ernst & Young, KPMG\n• Various Kerala-based tech companies\n\n📍 **Location Advantage**\n• CUSAT is in Kalamassery, Kochi — within the Infopark and SmartCity tech corridor\n• Direct access to major IT companies for internships and placements\n\n🎓 **Program Highlights**\n• Pre-placement training and mock interviews\n• Industry interaction and guest lectures\n• Internship facilitation\n• Entrepreneurship cell for startup opportunities\n\nPlacement statistics vary by program. Shall I connect you with the placement cell for more details?",
-};
-
-function getAIResponse(userMessage: string): string {
-  const lower = userMessage.toLowerCase();
-  if (lower.includes('course') || lower.includes('program') || lower.includes('available')) return aiResponses['What courses are available?'];
-  if (lower.includes('mca') && (lower.includes('eligib') || lower.includes('qualify'))) return aiResponses['What is the MCA eligibility?'];
-  if (lower.includes('fee') || lower.includes('cost') || lower.includes('price') || lower.includes('tuition')) return aiResponses['What is the fee structure?'];
-  if (lower.includes('scholarship') || lower.includes('merit') || lower.includes('financial')) return aiResponses['Are scholarships available?'];
-  if (lower.includes('hostel') || lower.includes('accommodation') || lower.includes('stay')) return aiResponses['What are the hostel facilities?'];
-  if (lower.includes('eligib') || lower.includes('requirement') || lower.includes('qualify')) return aiResponses['What is the MCA eligibility?'];
-  if (lower.includes('apply') || lower.includes('cat') || lower.includes('admission process') || lower.includes('how to')) return aiResponses['How can I apply to CUSAT?'];
-  if (lower.includes('placement') || lower.includes('job') || lower.includes('recruit') || lower.includes('career')) return aiResponses['What are placement opportunities?'];
-  return "Hello! I am the CUSAT Admission Assistant. I can help you with information about:\n\n• Courses & programs offered at CUSAT\n• Fee structure & scholarship options\n• Hostel facilities on campus\n• Eligibility requirements for various programs\n• CUSAT CAT admission process\n• Placement opportunities\n\nPlease note: This is a demo AI assistant. For official and most current information, visit the official CUSAT website. What would you like to know?";
-}
+const WELCOME = "Hello! I am the CUSAT Admission Assistant. I can help you with courses, admissions, fees, scholarships, hostels, placements, eligibility requirements, and application procedures.\n\nAsk me anything about CUSAT admissions!";
 
 interface Message {
   id: string;
@@ -52,47 +33,22 @@ interface ConversationSession {
   messages: Message[];
 }
 
-const WELCOME = "Hello! I am the CUSAT Admission Assistant. I can help you with courses, admissions, fees, scholarships, hostels, placements, eligibility requirements, and application procedures.\n\n_Note: This is a demo assistant. For official information, please refer to the CUSAT website._";
-
-const initialSessions: ConversationSession[] = [
-  {
-    id: '1',
-    title: 'B.Tech CSE Enquiry',
-    lastMessage: 'What are the scholarship options?',
-    date: 'Today',
+function makeWelcomeSession(id: string, title = 'New Conversation', date = 'Today'): ConversationSession {
+  return {
+    id,
+    title,
+    lastMessage: '',
+    date,
     messages: [
-      { id: '1', role: 'assistant', content: WELCOME, timestamp: '10:30 AM' },
-      { id: '2', role: 'user', content: 'What courses are available?', timestamp: '10:31 AM' },
-      { id: '3', role: 'assistant', content: aiResponses['What courses are available?'], timestamp: '10:31 AM' },
-      { id: '4', role: 'user', content: 'Are scholarships available?', timestamp: '10:32 AM' },
-      { id: '5', role: 'assistant', content: aiResponses['Are scholarships available?'], timestamp: '10:32 AM' },
+      {
+        id: 'welcome',
+        role: 'assistant',
+        content: WELCOME,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
     ],
-  },
-  {
-    id: '2',
-    title: 'MCA Admission Query',
-    lastMessage: 'What are the placement opportunities?',
-    date: 'Yesterday',
-    messages: [
-      { id: '1', role: 'assistant', content: WELCOME, timestamp: '3:15 PM' },
-      { id: '2', role: 'user', content: 'What is the MCA eligibility?', timestamp: '3:16 PM' },
-      { id: '3', role: 'assistant', content: aiResponses['What is the MCA eligibility?'], timestamp: '3:16 PM' },
-      { id: '4', role: 'user', content: 'What are placement opportunities?', timestamp: '3:17 PM' },
-      { id: '5', role: 'assistant', content: aiResponses['What are placement opportunities?'], timestamp: '3:17 PM' },
-    ],
-  },
-  {
-    id: '3',
-    title: 'Hostel Facilities Query',
-    lastMessage: 'What are the hostel facilities?',
-    date: 'Jan 19',
-    messages: [
-      { id: '1', role: 'assistant', content: WELCOME, timestamp: '11:00 AM' },
-      { id: '2', role: 'user', content: 'What are the hostel facilities?', timestamp: '11:01 AM' },
-      { id: '3', role: 'assistant', content: aiResponses['What are the hostel facilities?'], timestamp: '11:01 AM' },
-    ],
-  },
-];
+  };
+}
 
 function FormattedMessage({ content }: { content: string }) {
   const lines = content.split('\n');
@@ -119,8 +75,8 @@ function FormattedMessage({ content }: { content: string }) {
 }
 
 export function ChatPage() {
-  const [sessions, setSessions] = useState<ConversationSession[]>(initialSessions);
-  const [activeSessionId, setActiveSessionId] = useState('1');
+  const [sessions, setSessions] = useState<ConversationSession[]>(() => [makeWelcomeSession('default', 'CUSAT Enquiry', 'Today')]);
+  const [activeSessionId, setActiveSessionId] = useState('default');
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,8 +88,8 @@ export function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeSession?.messages, isTyping]);
 
-  const sendMessage = (text: string) => {
-    if (!text.trim()) return;
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || isTyping) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -150,39 +106,45 @@ export function ChatPage() {
     setInput('');
     setIsTyping(true);
 
-    setTimeout(() => {
+    try {
+      const res = await apiClient.post<{ data: { answer: string } }>(API_ENDPOINTS.chat.ask, { question: text.trim() });
+      const answer = res.data?.data?.answer ?? "I could not find that information in the uploaded university documents. Please contact the admissions office for confirmation.";
+
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: getAIResponse(text),
+        content: answer,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      // Auto-title the session from the first user question
+      setSessions((prev) => prev.map((s) => {
+        if (s.id !== activeSessionId) return s;
+        const isUntitled = s.title === 'New Conversation' || s.title === 'CUSAT Enquiry';
+        return {
+          ...s,
+          title: isUntitled && s.messages.length <= 2 ? text.trim().slice(0, 40) : s.title,
+          messages: [...s.messages, aiMsg],
+        };
+      }));
+    } catch {
+      const errorMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I could not find that information in the uploaded university documents. Please contact the admissions office for confirmation.",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setSessions((prev) => prev.map((s) =>
-        s.id === activeSessionId
-          ? { ...s, messages: [...s.messages, aiMsg] }
-          : s
+        s.id === activeSessionId ? { ...s, messages: [...s.messages, errorMsg] } : s
       ));
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const newChat = () => {
     const id = Date.now().toString();
-    const newSession: ConversationSession = {
-      id,
-      title: 'New Conversation',
-      lastMessage: '',
-      date: 'Today',
-      messages: [
-        {
-          id: '1',
-          role: 'assistant',
-          content: WELCOME,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ],
-    };
-    setSessions((prev) => [newSession, ...prev]);
+    setSessions((prev) => [makeWelcomeSession(id), ...prev]);
     setActiveSessionId(id);
   };
 
@@ -246,13 +208,13 @@ export function ChatPage() {
               <p className="text-sm font-semibold text-slate-900">CUSAT Admission Assistant</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
-                <span className="text-xs text-slate-400">Online · Demo Mode</span>
+                <span className="text-xs text-slate-400">Online · RAG Mode</span>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
             <Database className="w-3 h-3" />
-            CUSAT Knowledge Base
+            Document Knowledge Base
           </div>
         </div>
 
@@ -341,7 +303,7 @@ export function ChatPage() {
               <Send className="w-4 h-4" />
             </button>
           </form>
-          <p className="text-xs text-slate-400 text-center mt-2">Demo assistant using CUSAT admission data. Not affiliated with CUSAT.</p>
+          <p className="text-xs text-slate-400 text-center mt-2">Answers are sourced from uploaded university documents only.</p>
         </div>
       </div>
     </div>

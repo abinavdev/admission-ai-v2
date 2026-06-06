@@ -1,8 +1,11 @@
 import { Router } from 'express';
-import { getSessions, createSession, getSession, addMessage, getMessages } from '../controllers/chat';
+import { getSessions, createSession, getSession, addMessage, getMessages, askQuestion } from '../controllers/chat';
 import { authenticateUser } from '../middleware/auth';
 
 const router = Router();
+
+// Public RAG endpoint — no auth required for Student Portal
+router.post('/ask', askQuestion);
 
 router.use(authenticateUser);
 router.get('/sessions', getSessions);

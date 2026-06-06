@@ -1,7 +1,20 @@
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { prisma } from '../config/database';
 import { success, error, paginated } from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
+import { retrieveRelevantChunks, buildAnswer } from '../services/retrieval';
+
+export async function askQuestion(req: Request, res: Response): Promise<void> {
+  const { question } = req.body;
+  if (!question || typeof question !== 'string' || question.trim().length === 0) {
+    error(res, 'Question is required');
+    return;
+  }
+
+  const chunks = await retrieveRelevantChunks(question.trim(), 5);
+  const answer = buildAnswer(question.trim(), chunks);
+  success(res, { answer, sourceCount: chunks.length });
+}
 
 export async function getSessions(req: AuthRequest, res: Response): Promise<void> {
   const page = parseInt(req.query.page as string || '1', 10);

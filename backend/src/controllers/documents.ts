@@ -4,6 +4,7 @@ import fs from 'fs';
 import { prisma } from '../config/database';
 import { success, error, paginated } from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
+import { processDocument } from '../services/documentProcessor';
 
 export async function getDocuments(req: AuthRequest, res: Response): Promise<void> {
   const page = parseInt(req.query.page as string || '1', 10);
@@ -46,15 +47,18 @@ export async function uploadDocument(req: AuthRequest, res: Response): Promise<v
     },
   });
 
-  // Simulate async processing
-  setTimeout(async () => {
-    await prisma.document.update({
-      where: { id: document.id },
-      data: { status: 'PROCESSED' },
-    });
-  }, 3000);
+  // Kick off real async processing
+  setImmediate(() => processDocument(document.id));
 
   success(res, document, 201);
+}
+
+export async function getDocumentStats(_req: AuthRequest, res: Response): Promise<void> {
+  const [totalChunks, failedCount] = await Promise.all([
+    prisma.documentChunk.count(),
+    prisma.document.count({ where: { status: 'FAILED' } }),
+  ]);
+  success(res, { totalChunks, failedCount });
 }
 
 export async function deleteDocument(req: AuthRequest, res: Response): Promise<void> {
