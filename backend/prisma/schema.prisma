@@ -11,16 +11,16 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
+  id        String    @id @default(cuid())
+  email     String    @unique
   password  String
   name      String
-  role      UserRole @default(ADMISSION_OFFICER)
-  status    String   @default("Active")
-  lastLogin DateTime?
+  role      UserRole  @default(ADMISSION_OFFICER)
+  status    String    @default("Active")
+  lastLogin DateTime? @map("last_login")
   avatar    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   chatSessions ChatSession[]
   leads        Lead[]
@@ -35,18 +35,18 @@ enum UserRole {
 }
 
 model Lead {
-  id        String     @id @default(cuid())
-  name      String
-  phone     String
-  email     String
-  course    String
-  status    LeadStatus @default(NEW)
-  source    LeadSource
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id         String     @id @default(cuid())
+  name       String
+  phone      String
+  email      String
+  course     String
+  status     LeadStatus @default(NEW)
+  source     LeadSource
+  assignedTo String?    @map("assigned_to")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
 
-  assignedTo   String?
-  assignedUser User?   @relation(fields: [assignedTo], references: [id])
+  assignedUser User? @relation(fields: [assignedTo], references: [id])
 
   @@map("leads")
 }
@@ -66,12 +66,12 @@ enum LeadSource {
 
 model ChatSession {
   id             String   @id @default(cuid())
-  studentName    String
-  courseInterest String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  studentName    String   @map("student_name")
+  courseInterest String?  @map("course_interest")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  agentId String?
+  agentId String? @map("agent_id")
   agent   User?   @relation(fields: [agentId], references: [id])
 
   messages ChatMessage[]
@@ -81,10 +81,10 @@ model ChatSession {
 
 model ChatMessage {
   id        String      @id @default(cuid())
-  sessionId String
+  sessionId String      @map("session_id")
   role      MessageRole
   content   String      @db.Text
-  createdAt DateTime    @default(now())
+  createdAt DateTime    @default(now()) @map("created_at")
 
   session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
@@ -100,11 +100,11 @@ model Document {
   id         String         @id @default(cuid())
   name       String
   size       Int
-  mimeType   String
-  filePath   String
+  mimeType   String         @map("mime_type")
+  filePath   String         @map("file_path")
   status     DocumentStatus @default(QUEUED)
-  uploadedAt DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
+  uploadedAt DateTime       @default(now()) @map("uploaded_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
 
   chunks DocumentChunk[]
 
@@ -120,10 +120,10 @@ enum DocumentStatus {
 
 model DocumentChunk {
   id         String   @id @default(cuid())
-  documentId String
+  documentId String   @map("document_id")
   content    String   @db.Text
-  chunkIndex Int
-  createdAt  DateTime @default(now())
+  chunkIndex Int      @map("chunk_index")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
@@ -132,13 +132,13 @@ model DocumentChunk {
 
 model CallLog {
   id          String     @id @default(cuid())
-  studentName String
+  studentName String     @map("student_name")
   phone       String
   duration    String
   status      CallStatus
   transcript  String?    @db.Text
-  calledAt    DateTime   @default(now())
-  createdAt   DateTime   @default(now())
+  calledAt    DateTime   @default(now()) @map("called_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
 
   @@map("call_logs")
 }

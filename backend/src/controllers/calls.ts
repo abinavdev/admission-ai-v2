@@ -32,3 +32,49 @@ export async function getCallLog(req: AuthRequest, res: Response): Promise<void>
   }
   success(res, call);
 }
+
+export async function createCallLog(req: AuthRequest, res: Response): Promise<void> {
+  const { studentName, phone, duration, status, transcript, calledAt } = req.body;
+  if (!studentName || !phone) {
+    error(res, 'Student name and phone are required');
+    return;
+  }
+
+  const call = await prisma.callLog.create({
+    data: {
+      studentName,
+      phone,
+      duration: duration || '0:00',
+      status: status || 'COMPLETED',
+      transcript: transcript || '',
+      calledAt: calledAt ? new Date(calledAt) : new Date(),
+    },
+  });
+  success(res, call, 201);
+}
+
+export async function updateCallLog(req: AuthRequest, res: Response): Promise<void> {
+  const { studentName, phone, duration, status, transcript } = req.body;
+
+  const existing = await prisma.callLog.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    error(res, 'Call log not found', 404);
+    return;
+  }
+
+  const call = await prisma.callLog.update({
+    where: { id: req.params.id },
+    data: { studentName, phone, duration, status, transcript },
+  });
+  success(res, call);
+}
+
+export async function deleteCallLog(req: AuthRequest, res: Response): Promise<void> {
+  const existing = await prisma.callLog.findUnique({ where: { id: req.params.id } });
+  if (!existing) {
+    error(res, 'Call log not found', 404);
+    return;
+  }
+  await prisma.callLog.delete({ where: { id: req.params.id } });
+  success(res, { deleted: true });
+}
