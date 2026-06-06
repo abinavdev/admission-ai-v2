@@ -25,7 +25,12 @@ const dashboardPages: Page[] = [
 
 function AppRoutes() {
   const { isAuthenticated } = useAuthContext();
-  const [currentPage, setCurrentPage] = useState<Page>('landing');
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    const token = localStorage.getItem('auth_token');
+    const user = localStorage.getItem('auth_user');
+    if (token && user) return 'dashboard';
+    return 'landing';
+  });
 
   const navigate = (page: Page) => setCurrentPage(page);
 

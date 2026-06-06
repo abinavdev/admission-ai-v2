@@ -11,7 +11,7 @@ const sourceOptions = ['All', 'Chat', 'Voice'];
 const ITEMS_PER_PAGE = 8;
 
 function normalizeStatus(s: string): string {
-  return s.replace('_', '-').replace(/\b\w/g, (c) => c.toUpperCase());
+  return s.replace('_', '-').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 function normalizeSource(s: string): 'Chat' | 'Voice' {
   return s === 'CHAT' ? 'Chat' : 'Voice';
