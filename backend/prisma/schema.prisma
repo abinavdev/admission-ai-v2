@@ -1,5 +1,3 @@
-// This is your Prisma schema file
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,48 +5,108 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  password  String
-  name      String
-  role      UserRole  @default(ADMISSION_OFFICER)
-  status    String    @default("Active")
-  lastLogin DateTime? @map("last_login")
-  avatar    String?
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-
-  chatSessions ChatSession[]
-  leads        Lead[]
+  id            String        @id @default(cuid())
+  email         String        @unique
+  password      String
+  name          String
+  role          UserRole      @default(ADMISSION_OFFICER)
+  status        String        @default("Active")
+  lastLogin     DateTime?
+  avatar        String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime
+  chat_sessions ChatSession[]
+  leads         Lead[]
 
   @@map("users")
+}
+
+model Lead {
+  id           String     @id @default(cuid())
+  name         String
+  phone        String
+  email        String
+  course       String
+  status       LeadStatus @default(NEW)
+  source       LeadSource
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  assignedTo   String?    @map("assigned_to")
+  assignedUser User?      @relation(fields: [assignedTo], references: [id], map: "leads_assignedTo_fkey")
+
+  @@map("leads")
+}
+
+model ChatSession {
+  id             String        @id @default(cuid())
+  studentName    String
+  courseInterest String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime
+  agentId        String?
+  chat_messages  ChatMessage[]
+  users          User?         @relation(fields: [agentId], references: [id])
+
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id            String      @id @default(cuid())
+  sessionId     String
+  role          MessageRole
+  content       String
+  createdAt     DateTime    @default(now())
+  chat_sessions ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model Document {
+  id              String          @id @default(cuid())
+  name            String
+  size            Int
+  mimeType        String
+  filePath        String
+  status          DocumentStatus  @default(QUEUED)
+  uploadedAt      DateTime        @default(now())
+  updatedAt       DateTime
+  document_chunks DocumentChunk[]
+
+  @@map("documents")
+}
+
+model DocumentChunk {
+  id         String   @id @default(cuid())
+  documentId String
+  content    String
+  chunkIndex Int
+  createdAt  DateTime @default(now())
+  documents  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("document_chunks")
+}
+
+model CallLog {
+  id          String     @id @default(cuid())
+  studentName String
+  phone       String
+  duration    String
+  status      CallStatus
+  transcript  String?
+  calledAt    DateTime   @default(now())
+  createdAt   DateTime   @default(now())
+
+  @@map("call_logs")
 }
 
 enum UserRole {
   ADMIN
   ADMISSION_OFFICER
   VIEWER
-}
-
-model Lead {
-  id         String     @id @default(cuid())
-  name       String
-  phone      String
-  email      String
-  course     String
-  status     LeadStatus @default(NEW)
-  source     LeadSource
-  assignedTo String?    @map("assigned_to")
-  createdAt  DateTime   @default(now()) @map("created_at")
-  updatedAt  DateTime   @updatedAt @map("updated_at")
-
-  assignedUser User? @relation(fields: [assignedTo], references: [id])
-
-  @@map("leads")
 }
 
 enum LeadStatus {
@@ -64,51 +122,9 @@ enum LeadSource {
   VOICE
 }
 
-model ChatSession {
-  id             String   @id @default(cuid())
-  studentName    String   @map("student_name")
-  courseInterest String?  @map("course_interest")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  agentId String? @map("agent_id")
-  agent   User?   @relation(fields: [agentId], references: [id])
-
-  messages ChatMessage[]
-
-  @@map("chat_sessions")
-}
-
-model ChatMessage {
-  id        String      @id @default(cuid())
-  sessionId String      @map("session_id")
-  role      MessageRole
-  content   String      @db.Text
-  createdAt DateTime    @default(now()) @map("created_at")
-
-  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-
-  @@map("chat_messages")
-}
-
 enum MessageRole {
   USER
   ASSISTANT
-}
-
-model Document {
-  id         String         @id @default(cuid())
-  name       String
-  size       Int
-  mimeType   String         @map("mime_type")
-  filePath   String         @map("file_path")
-  status     DocumentStatus @default(QUEUED)
-  uploadedAt DateTime       @default(now()) @map("uploaded_at")
-  updatedAt  DateTime       @updatedAt @map("updated_at")
-
-  chunks DocumentChunk[]
-
-  @@map("documents")
 }
 
 enum DocumentStatus {
@@ -116,31 +132,6 @@ enum DocumentStatus {
   PROCESSING
   PROCESSED
   FAILED
-}
-
-model DocumentChunk {
-  id         String   @id @default(cuid())
-  documentId String   @map("document_id")
-  content    String   @db.Text
-  chunkIndex Int      @map("chunk_index")
-  createdAt  DateTime @default(now()) @map("created_at")
-
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@map("document_chunks")
-}
-
-model CallLog {
-  id          String     @id @default(cuid())
-  studentName String     @map("student_name")
-  phone       String
-  duration    String
-  status      CallStatus
-  transcript  String?    @db.Text
-  calledAt    DateTime   @default(now()) @map("called_at")
-  createdAt   DateTime   @default(now()) @map("created_at")
-
-  @@map("call_logs")
 }
 
 enum CallStatus {
