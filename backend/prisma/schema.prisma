@@ -9,18 +9,19 @@ datasource db {
 }
 
 model User {
-  id            String        @id @default(cuid())
-  email         String        @unique
-  password      String
-  name          String
-  role          UserRole      @default(ADMISSION_OFFICER)
-  status        String        @default("Active")
-  lastLogin     DateTime?
-  avatar        String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime
-  chat_sessions ChatSession[]
-  leads         Lead[]
+  id           String        @id @default(cuid())
+  email        String        @unique
+  password     String
+  name         String
+  role         UserRole      @default(ADMISSION_OFFICER)
+  status       String        @default("Active")
+  lastLogin    DateTime?
+  avatar       String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  chatSessions ChatSession[]
+  leads        Lead[]
 
   @@map("users")
 }
@@ -33,48 +34,57 @@ model Lead {
   course       String
   status       LeadStatus @default(NEW)
   source       LeadSource
+
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
   assignedTo   String?    @map("assigned_to")
-  assignedUser User?      @relation(fields: [assignedTo], references: [id], map: "leads_assignedTo_fkey")
+
+  assignedUser User? @relation(fields: [assignedTo], references: [id], map: "leads_assignedTo_fkey")
 
   @@map("leads")
 }
 
 model ChatSession {
-  id             String        @id @default(cuid())
+  id             String   @id @default(cuid())
   studentName    String
   courseInterest String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
   agentId        String?
-  chat_messages  ChatMessage[]
-  users          User?         @relation(fields: [agentId], references: [id])
+
+  messages       ChatMessage[]
+  agent          User? @relation(fields: [agentId], references: [id])
 
   @@map("chat_sessions")
 }
 
 model ChatMessage {
-  id            String      @id @default(cuid())
-  sessionId     String
-  role          MessageRole
-  content       String
-  createdAt     DateTime    @default(now())
-  chat_sessions ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id        String      @id @default(cuid())
+  sessionId String
+  role      MessageRole
+  content   String
+
+  createdAt DateTime @default(now())
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("chat_messages")
 }
 
 model Document {
-  id              String          @id @default(cuid())
-  name            String
-  size            Int
-  mimeType        String
-  filePath        String
-  status          DocumentStatus  @default(QUEUED)
-  uploadedAt      DateTime        @default(now())
-  updatedAt       DateTime
-  document_chunks DocumentChunk[]
+  id         String         @id @default(cuid())
+  name       String
+  size       Int
+  mimeType   String
+  filePath   String
+  status     DocumentStatus @default(QUEUED)
+
+  uploadedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  chunks DocumentChunk[]
 
   @@map("documents")
 }
@@ -84,8 +94,10 @@ model DocumentChunk {
   documentId String
   content    String
   chunkIndex Int
-  createdAt  DateTime @default(now())
-  documents  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@map("document_chunks")
 }
@@ -97,8 +109,9 @@ model CallLog {
   duration    String
   status      CallStatus
   transcript  String?
-  calledAt    DateTime   @default(now())
-  createdAt   DateTime   @default(now())
+
+  calledAt  DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@map("call_logs")
 }

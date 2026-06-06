@@ -5,6 +5,8 @@ import {
   Database, AlertCircle, ExternalLink,
 } from 'lucide-react';
 import { Page } from '../types';
+import { apiClient } from '../api/client';
+import { API_ENDPOINTS } from '../api/endpoints';
 
 interface StudentPortalProps {
   onNavigate: (page: Page) => void;
@@ -117,19 +119,51 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  const sendMessage = (text: string) => {
-    if (!text.trim()) return;
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text.trim() };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
-    setIsTyping(true);
-    setTimeout(() => {
-      const aiMsg: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: getResponse(text) };
-      setMessages((prev) => [...prev, aiMsg]);
-      setIsTyping(false);
-    }, 1400);
+  const sendMessage = async (text: string) => {
+  if (!text.trim()) return;
+
+  const userMsg: Message = {
+    id: Date.now().toString(),
+    role: 'user',
+    content: text.trim(),
   };
 
+  setMessages((prev) => [...prev, userMsg]);
+  setInput('');
+  setIsTyping(true);
+
+  try {
+    const response = await apiClient.post(
+      API_ENDPOINTS.chat.ask,
+      {
+        question: text.trim(),
+      }
+    );
+
+    const aiMsg: Message = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content:
+        response.data?.data?.answer ||
+        'No answer found.',
+    };
+
+    setMessages((prev) => [...prev, aiMsg]);
+  } catch (err) {
+    console.error(err);
+
+    const aiMsg: Message = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content:
+        'Sorry, I could not connect to the knowledge base.',
+    };
+
+    setMessages((prev) => [...prev, aiMsg]);
+  } finally {
+    setIsTyping(false);
+  }
+};
   const submitLead = (e: React.FormEvent) => {
     e.preventDefault();
     setLeadSubmitted(true);

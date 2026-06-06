@@ -4,8 +4,8 @@ import path from 'path';
 const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
 import { prisma } from '../config/database';
 
-const CHUNK_SIZE = 900;
-const CHUNK_OVERLAP = 175;
+const CHUNK_SIZE = 300;
+const CHUNK_OVERLAP = 50;
 
 function cleanText(text: string): string {
   return text
