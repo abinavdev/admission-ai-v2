@@ -23,5 +23,9 @@ export const API_ENDPOINTS = {
   },
   analytics: {
     summary: '/analytics',
+    overview: '/analytics/overview',
+  },
+  dashboard: {
+    stats: '/dashboard/stats',
   },
 };

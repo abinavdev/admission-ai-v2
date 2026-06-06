@@ -50,9 +50,12 @@ function HorizontalBar({ label, count, total, color }: { label: string; count: n
 const courseColors = ['#003B7A', '#F4B400', '#0ea5e9', '#22c55e', '#f59e0b', '#8b5cf6', '#94a3b8'];
 
 export function AnalyticsPage() {
-  const { analytics, loading, fetchAnalytics } = useAnalytics();
+  const { analytics, loading, fetchAnalytics, fetchOverview } = useAnalytics();
 
-  useEffect(() => { fetchAnalytics().catch(() => {}); }, [fetchAnalytics]);
+  useEffect(() => {
+    fetchAnalytics().catch(() => {});
+    fetchOverview().catch(() => {});
+  }, [fetchAnalytics, fetchOverview]);
 
   const overview = analytics?.overview;
   const leadsByStatus = analytics?.leadsByStatus ?? [];

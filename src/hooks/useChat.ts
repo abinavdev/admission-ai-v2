@@ -8,6 +8,7 @@ interface UseChatsReturn {
   loading: boolean;
   error: string | null;
   fetchSessions: () => Promise<void>;
+  fetchSession: (id: string) => Promise<Record<string, unknown>>;
   createSession: (studentName: string, courseInterest?: string) => Promise<ChatSession>;
 }
 
@@ -30,6 +31,11 @@ export function useChats(): UseChatsReturn {
     }
   }, []);
 
+  const fetchSession = useCallback(async (id: string): Promise<Record<string, unknown>> => {
+    const res = await apiClient.get<{ data: Record<string, unknown> }>(API_ENDPOINTS.chat.session(id));
+    return res.data.data;
+  }, []);
+
   const createSession = useCallback(async (studentName: string, courseInterest?: string) => {
     const res = await apiClient.post<{ data: ChatSession }>(API_ENDPOINTS.chat.sessions, {
       studentName,
@@ -39,5 +45,5 @@ export function useChats(): UseChatsReturn {
     return res.data.data;
   }, []);
 
-  return { sessions, loading, error, fetchSessions, createSession };
+  return { sessions, loading, error, fetchSessions, fetchSession, createSession };
 }

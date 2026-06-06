@@ -23,7 +23,8 @@ export function ChatHistoryPage() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<ChatSession | null>(null);
   const [selectedMessages, setSelectedMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
-  const { sessions: rawSessions, loading, error, fetchSessions } = useChats();
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const { sessions: rawSessions, loading, error, fetchSessions, fetchSession } = useChats();
   const toast = useToast();
 
   useEffect(() => { fetchSessions(); }, [fetchSessions]);
@@ -42,6 +43,21 @@ export function ChatHistoryPage() {
   const avgMessages = chatSessions.length > 0
     ? Math.round(chatSessions.reduce((a, b) => a + b.messageCount, 0) / chatSessions.length)
     : 0;
+
+  const handleViewSession = async (row: ChatSession) => {
+    setSelected(row);
+    setSelectedMessages([]);
+    setLoadingMessages(true);
+    try {
+      const detail = await fetchSession(row.id);
+      const normalized = normalizeSession(detail);
+      setSelectedMessages(normalized.messages);
+    } catch {
+      toast('Failed to load messages', 'error');
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
 
   const columns = [
     {
@@ -76,7 +92,7 @@ export function ChatHistoryPage() {
     {
       key: 'action', header: 'Conversation',
       render: (row: ChatSession) => (
-        <button onClick={() => { setSelected(row); setSelectedMessages(row.messages); }} className="flex items-center gap-1 text-xs text-[#003B7A] hover:underline font-medium">
+        <button onClick={() => handleViewSession(row)} className="flex items-center gap-1 text-xs text-[#003B7A] hover:underline font-medium">
           <Eye className="w-3 h-3" />
           View
         </button>
@@ -128,7 +144,9 @@ export function ChatHistoryPage() {
               <span className="text-xs text-slate-400 ml-auto">{selected.date}</span>
             </div>
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {selectedMessages.length === 0 ? (
+              {loadingMessages ? (
+                Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />)
+              ) : selectedMessages.length === 0 ? (
                 <p className="text-xs text-slate-400 text-center py-6">No messages recorded</p>
               ) : (
                 selectedMessages.map((msg, i) => (

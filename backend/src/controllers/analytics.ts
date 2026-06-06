@@ -3,6 +3,15 @@ import { prisma } from '../config/database';
 import { success } from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
 
+export async function getAnalyticsOverview(_req: AuthRequest, res: Response): Promise<void> {
+  const [leadsByStatus, callsByStatus] = await Promise.all([
+    prisma.lead.groupBy({ by: ['status'], _count: { _all: true } }),
+    prisma.callLog.groupBy({ by: ['status'], _count: { _all: true } }),
+  ]);
+
+  success(res, { leadStatusBreakdown: leadsByStatus, callStatusBreakdown: callsByStatus });
+}
+
 export async function getAnalytics(_req: AuthRequest, res: Response): Promise<void> {
   const [
     totalLeads,

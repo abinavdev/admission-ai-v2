@@ -12,6 +12,7 @@ import chatRoutes from './routes/chat';
 import documentsRoutes from './routes/documents';
 import callsRoutes from './routes/calls';
 import analyticsRoutes from './routes/analytics';
+import dashboardRoutes from './routes/dashboard';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -30,6 +31,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/calls', callsRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

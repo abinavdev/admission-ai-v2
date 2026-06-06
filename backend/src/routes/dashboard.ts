@@ -1,11 +1,10 @@
 import { Router } from 'express';
-import { getAnalytics, getAnalyticsOverview } from '../controllers/analytics';
+import { getDashboardStats } from '../controllers/dashboard';
 import { authenticateUser } from '../middleware/auth';
 
 const router = Router();
 
 router.use(authenticateUser);
-router.get('/', getAnalytics);
-router.get('/overview', getAnalyticsOverview);
+router.get('/stats', getDashboardStats);
 
 export default router;

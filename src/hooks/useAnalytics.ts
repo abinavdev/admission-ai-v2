@@ -17,15 +17,23 @@ interface AnalyticsData {
   recentLeads: Record<string, unknown>[];
 }
 
+interface AnalyticsOverview {
+  leadStatusBreakdown: { status: string; _count: { _all: number } }[];
+  callStatusBreakdown: { status: string; _count: { _all: number } }[];
+}
+
 interface UseAnalyticsReturn {
   analytics: AnalyticsData | null;
+  overview: AnalyticsOverview | null;
   loading: boolean;
   error: string | null;
   fetchAnalytics: () => Promise<void>;
+  fetchOverview: () => Promise<void>;
 }
 
 export function useAnalytics(): UseAnalyticsReturn {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,5 +51,19 @@ export function useAnalytics(): UseAnalyticsReturn {
     }
   }, []);
 
-  return { analytics, loading, error, fetchAnalytics };
+  const fetchOverview = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await apiClient.get<{ data: AnalyticsOverview }>(API_ENDPOINTS.analytics.overview);
+      setOverview(res.data.data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to fetch analytics overview';
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { analytics, overview, loading, error, fetchAnalytics, fetchOverview };
 }

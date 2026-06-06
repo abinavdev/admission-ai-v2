@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { StatCard } from '../components/ui/StatCard';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { useDashboard } from '../hooks/useDashboard';
 import { StatCardSkeleton, TableRowSkeleton, Skeleton } from '../components/ui/Skeleton';
 import {
   dailyCallsData, dailyChatsData, leadsTimelineData,
@@ -46,8 +47,12 @@ const courseColors = ['#003B7A', '#F4B400', '#0ea5e9', '#22c55e', '#f59e0b', '#8
 
 export function DashboardPage() {
   const { analytics, loading, fetchAnalytics } = useAnalytics();
+  const { stats, fetchStats } = useDashboard();
 
-  useEffect(() => { fetchAnalytics().catch(() => {}); }, [fetchAnalytics]);
+  useEffect(() => {
+    fetchAnalytics().catch(() => {});
+    fetchStats().catch(() => {});
+  }, [fetchAnalytics, fetchStats]);
 
   const overview = analytics?.overview;
   const recentLeads = analytics?.recentLeads ?? [];
@@ -81,10 +86,10 @@ export function DashboardPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          <StatCard title="Total Calls" value={overview?.totalCalls ?? 0} icon={<Phone className="w-5 h-5 text-[#003B7A]" />} change={12.4} iconBg="bg-blue-50" />
-          <StatCard title="Total Chats" value={overview?.totalChats ?? 0} icon={<MessageSquare className="w-5 h-5 text-emerald-600" />} change={8.1} iconBg="bg-emerald-50" />
-          <StatCard title="Total Leads" value={overview?.totalLeads ?? 0} icon={<Users className="w-5 h-5 text-amber-600" />} change={15.3} iconBg="bg-amber-50" />
-          <StatCard title="Documents" value={overview?.totalDocuments ?? 0} icon={<FileText className="w-5 h-5 text-purple-600" />} iconBg="bg-purple-50" />
+          <StatCard title="Total Calls" value={stats?.totalCalls ?? overview?.totalCalls ?? 0} icon={<Phone className="w-5 h-5 text-[#003B7A]" />} change={12.4} iconBg="bg-blue-50" />
+          <StatCard title="Total Chats" value={stats?.totalChats ?? overview?.totalChats ?? 0} icon={<MessageSquare className="w-5 h-5 text-emerald-600" />} change={8.1} iconBg="bg-emerald-50" />
+          <StatCard title="Total Leads" value={stats?.totalLeads ?? overview?.totalLeads ?? 0} icon={<Users className="w-5 h-5 text-amber-600" />} change={15.3} iconBg="bg-amber-50" />
+          <StatCard title="Documents" value={stats?.totalDocuments ?? overview?.totalDocuments ?? 0} icon={<FileText className="w-5 h-5 text-purple-600" />} iconBg="bg-purple-50" />
           <StatCard title="Conversion" value={`${overview?.conversionRate ?? 0}%`} icon={<TrendingUp className="w-5 h-5 text-rose-600" />} change={2.8} iconBg="bg-rose-50" />
           <StatCard title="Active Agents" value={2} icon={<Bot className="w-5 h-5 text-indigo-600" />} iconBg="bg-indigo-50" />
         </div>
