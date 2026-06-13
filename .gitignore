@@ -1,3 +1,4 @@
+# Logs
 logs
 *.log
 npm-debug.log*
@@ -6,20 +7,41 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
-*.local
+build
 
+# Local env files
+.env
+.env.*
+!.env.example
+
+# IDE files
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# OS files
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-.env
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Local config
+*.local
+
+# Uploads
 backend/uploads/**
 !backend/uploads/.gitkeep
+
+# Coverage
+coverage
+
+# Prisma generated artifacts (optional)
+prisma/dev.db
