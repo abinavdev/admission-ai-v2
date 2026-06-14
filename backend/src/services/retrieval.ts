@@ -1,5 +1,5 @@
 import { prisma } from '../config/database';
-import { env } from '../config/env';
+import { semanticSearch } from './vectorSearch';
 
 const STOP_WORDS = new Set([
   'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
@@ -35,6 +35,10 @@ export interface RetrievedChunk {
   documentName: string;
   score: number;
   chunkIndex: number;
+  documentId: string;
+  semanticScore: number;
+  keywordScore: number;
+  hybridScore: number;
 }
 
 function tokenize(text: string): string[] {
@@ -122,11 +126,10 @@ export async function retrieveRelevantChunks(
   question: string,
   topK = 5
 ): Promise<RetrievedChunk[]> {
-
   const start = Date.now();
 
+  // 1. Keyword search (TF scoring)
   const queryTerms = tokenize(question);
-
   if (
     question.toLowerCase().includes('course') ||
     question.toLowerCase().includes('program') ||
@@ -138,35 +141,26 @@ export async function retrieveRelevantChunks(
   const expanded = expandTerms(queryTerms);
   const phrases = getPhrasesFromQuestion(question);
 
-  console.log('\n=========================');
-  console.log('QUESTION:', question);
-  console.log('QUERY TERMS:', queryTerms);
-  console.log('EXPANDED TERMS:', expanded);
-  console.log('PHRASES:', phrases);
-  console.log('=========================\n');
-
-  const chunks =
-    await prisma.documentChunk.findMany({
-      include: {
-        document: {
-          select: {
-            name: true,
-            status: true
-          }
-        }
-      },
-      where: {
-        document: {
-          status: 'PROCESSED'
+  const dbChunks = await prisma.documentChunk.findMany({
+    include: {
+      document: {
+        select: {
+          name: true,
+          status: true
         }
       }
-    });
+    },
+    where: {
+      document: {
+        status: 'PROCESSED'
+      }
+    }
+  });
 
-  if (chunks.length === 0) {
-    return [];
-  }
+  const keywordMap = new Map<string, any>();
+  let maxKeywordScore = 0;
 
-  const scored = chunks.map((chunk) => {
+  dbChunks.forEach((chunk) => {
     const tokens = tokenize(chunk.content);
     let score = tfScore(tokens, expanded);
 
@@ -182,44 +176,95 @@ export async function retrieveRelevantChunks(
 
     if (content.includes(question.toLowerCase())) score += 12;
 
-    return {
-      content: chunk.content,
-      documentName: chunk.document.name,
-      score,
-      chunkIndex: chunk.chunkIndex
-    };
+    if (score > 0) {
+      if (score > maxKeywordScore) {
+        maxKeywordScore = score;
+      }
+      keywordMap.set(chunk.id, {
+        id: chunk.id,
+        content: chunk.content,
+        documentName: chunk.document.name,
+        documentId: chunk.documentId,
+        chunkIndex: chunk.chunkIndex,
+        keywordScore: score
+      });
+    }
   });
 
-  const results = scored.filter((c) => c.score > 0).sort((a, b) => b.score - a.score).slice(0, Math.max(3, topK));
+  // 2. Semantic search
+  let semanticResults: any[] = [];
+  try {
+    semanticResults = await semanticSearch(question, 20);
+  } catch (err) {
+    console.error('[Hybrid Retrieval] Semantic search failed, falling back to keyword search only:', err);
+  }
 
-  console.log('\n===== TOP RESULTS =====');
+  const semanticMap = new Map<string, any>();
+  semanticResults.forEach((res) => {
+    semanticMap.set(res.id, res);
+  });
 
+  // 3. Merge results and calculate hybrid scores
+  const allChunkIds = new Set<string>([
+    ...keywordMap.keys(),
+    ...semanticMap.keys()
+  ]);
+
+  const hybridResults: RetrievedChunk[] = [];
+
+  allChunkIds.forEach((id) => {
+    const keywordInfo = keywordMap.get(id);
+    const semanticInfo = semanticMap.get(id);
+
+    const content = keywordInfo?.content || semanticInfo?.content || '';
+    const documentName = keywordInfo?.documentName || '';
+    const documentId = keywordInfo?.documentId || semanticInfo?.documentId || '';
+    const chunkIndex = keywordInfo?.chunkIndex !== undefined ? keywordInfo.chunkIndex : (semanticInfo?.chunkIndex || 0);
+
+    const keywordScore = keywordInfo?.keywordScore || 0;
+    const semanticScore = semanticInfo?.similarity || 0;
+
+    // Normalize keyword score to [0, 1]
+    const normalizedKeywordScore = maxKeywordScore > 0 ? keywordScore / maxKeywordScore : 0;
+
+    // Calculate hybrid score: 0.7 * semantic + 0.3 * keyword
+    const hybridScore = 0.7 * semanticScore + 0.3 * normalizedKeywordScore;
+
+    // Resolve documentName if it was only in semantic search and not in keywordMap
+    let resolvedDocumentName = documentName;
+    if (!resolvedDocumentName) {
+      const match = dbChunks.find((c) => c.id === id);
+      resolvedDocumentName = match?.document.name || 'Unknown Document';
+    }
+
+    hybridResults.push({
+      content,
+      documentName: resolvedDocumentName,
+      score: hybridScore, // maps to score for backwards compatibility
+      chunkIndex,
+      documentId,
+      semanticScore,
+      keywordScore,
+      hybridScore
+    });
+  });
+
+  // Sort by hybridScore descending and return top K
+  const sorted = hybridResults.sort((a, b) => b.hybridScore - a.hybridScore);
+  const results = sorted.slice(0, Math.max(3, topK));
+
+  console.log('\n===== HYBRID TOP RESULTS =====');
   results.forEach((result, index) => {
     console.log(`\n#${index + 1}`);
-    console.log(
-      'Document:',
-      result.documentName
-    );
-    console.log(
-      'Score:',
-      result.score
-    );
-    console.log(
-      'Chunk:',
-      result.chunkIndex
-    );
-    console.log(
-      result.content
-        .substring(0, 250)
-        .replace(/\n/g, ' ')
-    );
+    console.log('Document:', result.documentName);
+    console.log(`Score (Hybrid): ${result.hybridScore.toFixed(4)} (Semantic: ${result.semanticScore.toFixed(4)}, Keyword: ${result.keywordScore.toFixed(4)})`);
+    console.log('Chunk:', result.chunkIndex);
+    console.log(result.content.substring(0, 250).replace(/\n/g, ' '));
   });
-
-  console.log('\n=======================\n');
-
+  console.log('\n===============================\n');
   console.log('retrieval_time_ms=', Date.now() - start);
 
-  return results.slice(0, 3);
+  return results;
 }
 
 export function buildContext(chunks: RetrievedChunk[], maxChars = 3000): string {

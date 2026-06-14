@@ -86,6 +86,7 @@ model DocumentChunk {
   chunkIndex Int
   createdAt  DateTime @default(now())
   document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  embedding  Unsupported("vector(768)")?
 
   @@map("document_chunks")
 }
