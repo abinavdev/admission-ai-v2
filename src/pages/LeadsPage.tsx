@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Phone, MessageCircle } from 'lucide-react';
 import { Lead } from '../types';
 import { useLeads } from '../hooks/useLeads';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { useToast } from '../contexts/ToastContext';
 import { TableWrapper, DataTable } from '../components/ui/Table';
 import { TableRowSkeleton, Skeleton } from '../components/ui/Skeleton';
@@ -22,10 +23,34 @@ export function LeadsPage() {
   const [statusFilter, setStatusFilter] = useState('All');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [page, setPage] = useState(1);
-  const { leads, loading, error, fetchLeads, updateLead } = useLeads();
+  const { leads, loading, error, total, fetchLeads, updateLead } = useLeads();
+  const { analytics, fetchAnalytics } = useAnalytics();
   const toast = useToast();
 
-  useEffect(() => { fetchLeads(); }, [fetchLeads]);
+  const getActiveParams = useCallback(() => {
+    const params: Record<string, string> = {
+      page: String(page),
+      limit: String(ITEMS_PER_PAGE),
+    };
+    if (statusFilter !== 'All') {
+      params.status = statusFilter.toUpperCase().replace('-', '_');
+    }
+    if (sourceFilter !== 'All') {
+      params.source = sourceFilter.toUpperCase();
+    }
+    if (search) {
+      params.search = search;
+    }
+    return params;
+  }, [page, statusFilter, sourceFilter, search]);
+
+  useEffect(() => {
+    fetchLeads(getActiveParams()).catch(() => {});
+  }, [fetchLeads, getActiveParams]);
+
+  useEffect(() => {
+    fetchAnalytics().catch(() => {});
+  }, [fetchAnalytics]);
 
   useEffect(() => {
     if (error) toast(error, 'error');
@@ -40,22 +65,14 @@ export function LeadsPage() {
       : l.date ?? '',
   }));
 
-  const filtered = normalizedLeads.filter((l) => {
-    const q = search.toLowerCase();
-    const matchSearch = !q || l.name.toLowerCase().includes(q) || l.email.toLowerCase().includes(q) || l.course.toLowerCase().includes(q);
-    const matchStatus = statusFilter === 'All' || l.status === statusFilter;
-    const matchSource = sourceFilter === 'All' || l.source === sourceFilter;
-    return matchSearch && matchStatus && matchSource;
-  });
-
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
       await updateLead(id, { status: newStatus.toUpperCase().replace('-', '_') as Lead['status'] });
       toast('Lead status updated', 'success');
-      fetchLeads();
+      fetchLeads(getActiveParams()).catch(() => {});
+      fetchAnalytics().catch(() => {});
     } catch {
       toast('Failed to update lead', 'error');
     }
@@ -122,7 +139,8 @@ export function LeadsPage() {
           Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
         ) : (
           statusOptions.filter((s) => s !== 'All').map((status) => {
-            const count = normalizedLeads.filter((l) => l.status === status).length;
+            const dbStatus = status.toUpperCase().replace('-', '_');
+            const count = (analytics?.leadsByStatus ?? []).find((s) => s.status === dbStatus)?._count._all ?? 0;
             const colors: Record<string, string> = {
               New: 'text-blue-600 bg-blue-50 border-blue-100',
               Contacted: 'text-amber-600 bg-amber-50 border-amber-100',
@@ -146,7 +164,7 @@ export function LeadsPage() {
 
       <TableWrapper
         title="All Leads"
-        count={filtered.length}
+        count={total}
         onSearch={(q) => { setSearch(q); setPage(1); }}
         searchPlaceholder="Search by name, email, course..."
         onExport={() => {}}
@@ -174,13 +192,13 @@ export function LeadsPage() {
             <tbody>{Array.from({ length: 6 }).map((_, i) => <TableRowSkeleton key={i} cols={6} />)}</tbody>
           </table>
         ) : (
-          <DataTable columns={columns} data={paginated} emptyMessage="No leads found matching your filters" />
+          <DataTable columns={columns} data={normalizedLeads} emptyMessage="No leads found matching your filters" />
         )}
 
         {totalPages > 1 && (
           <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
             <span className="text-xs text-slate-400">
-              Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, filtered.length)} of {filtered.length}
+              Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, total)} of {total}
             </span>
             <div className="flex items-center gap-1">
               <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 transition-colors">Previous</button>

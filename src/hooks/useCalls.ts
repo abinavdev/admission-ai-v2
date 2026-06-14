@@ -3,10 +3,16 @@ import { apiClient } from '../api/client';
 import { API_ENDPOINTS } from '../api/endpoints';
 import { CallLog } from '../types';
 
+interface CallsResponse {
+  data: CallLog[];
+  pagination: { total: number; page: number; limit: number; pages: number };
+}
+
 interface UseCallsReturn {
   calls: CallLog[];
   loading: boolean;
   error: string | null;
+  total: number;
   fetchCalls: (params?: Record<string, string>) => Promise<void>;
   createCall: (data: Partial<CallLog>) => Promise<CallLog>;
   updateCall: (id: string, data: Partial<CallLog>) => Promise<CallLog>;
@@ -17,13 +23,15 @@ export function useCalls(): UseCallsReturn {
   const [calls, setCalls] = useState<CallLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
 
   const fetchCalls = useCallback(async (params: Record<string, string> = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiClient.get<{ data: CallLog[] }>(API_ENDPOINTS.calls.list, { params });
+      const res = await apiClient.get<CallsResponse>(API_ENDPOINTS.calls.list, { params });
       setCalls(res.data.data);
+      setTotal(res.data.pagination.total);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch calls';
       setError(msg);
@@ -51,5 +59,5 @@ export function useCalls(): UseCallsReturn {
     setCalls((prev) => prev.filter((c) => c.id !== id));
   }, []);
 
-  return { calls, loading, error, fetchCalls, createCall, updateCall, deleteCall };
+  return { calls, loading, error, total, fetchCalls, createCall, updateCall, deleteCall };
 }

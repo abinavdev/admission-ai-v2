@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useAuthContext } from '../contexts/AuthContext';
 import {
   Phone, MessageSquare, Users, FileText, TrendingUp, Bot,
   MessageCircle, UserCheck,
@@ -46,6 +47,7 @@ function ConversionBar({ label, count, total, color }: { label: string; count: n
 const courseColors = ['#003B7A', '#F4B400', '#0ea5e9', '#22c55e', '#f59e0b', '#8b5cf6', '#94a3b8'];
 
 export function DashboardPage() {
+  const { user } = useAuthContext();
   const { analytics, loading, fetchAnalytics } = useAnalytics();
   const { stats, fetchStats } = useDashboard();
 
@@ -70,8 +72,8 @@ export function DashboardPage() {
       {/* Greeting banner */}
       <div className="bg-gradient-to-r from-[#003B7A] to-[#0059b3] rounded-2xl px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-white font-semibold text-lg">Good morning, Dr. Suresh!</h2>
-          <p className="text-blue-200 text-sm mt-0.5">Your AI agents handled 87 enquiries overnight. Here's your overview.</p>
+          <h2 className="text-white font-semibold text-lg">Good morning, {user?.name || 'User'}!</h2>
+          <p className="text-blue-200 text-sm mt-0.5">Here's your overview.</p>
         </div>
         <div className="flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/20 px-4 py-2 rounded-xl">
           <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />

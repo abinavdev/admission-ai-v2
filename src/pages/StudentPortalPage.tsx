@@ -22,29 +22,6 @@ const suggestedQuestions = [
   'What are placement opportunities?',
 ];
 
-const aiResponses: Record<string, string> = {
-  courses: "CUSAT offers programs across multiple departments:\n\n**Engineering (B.Tech — 4 years)**\n• Computer Science & Engineering\n• Electronics & Communication Engineering\n• Mechanical Engineering, Civil Engineering\n• Chemical Engineering, Polymer Science & Rubber Technology\n\n**Technology (M.Tech — 2 years)**\n• Artificial Intelligence, VLSI Design\n• Marine Technology, Environmental Engineering\n\n**Science**\n• Integrated M.Sc (5 years)\n• M.Sc in Physics, Chemistry, Maths, CS, Photonics\n\n**Management**\n• MBA (2 years), BBA (3 years)\n\n**Computer Applications**\n• MCA (3 years)\n\n**Research:** Ph.D across all departments\n\nWhich program would you like to know more about?",
-  mca: "For MCA at CUSAT:\n\n**Eligibility**\n• Any Bachelor's degree with minimum 50% marks\n• Mathematics at degree level or at 10+2 level (mandatory)\n\n**Admission**\n• Through CUSAT CAT (Common Admission Test)\n• Centralised counselling based on rank\n\n**Program Details**\n• Duration: 3 years (6 semesters)\n• Full-time residential program\n• Location: Main campus, Kalamassery, Kochi\n\n**Career Opportunities**\n• IT companies at Infopark & SmartCity, Kochi\n• TCS, Infosys, Wipro, UST Global, IBS Software\n\nShall I help you with the application process?",
-  fees: "CUSAT fee structure (approximate — subject to official revision):\n\n**B.Tech**\n• Government aided seats: ~₹25,000/year\n• Self-financing: Higher fees apply\n\n**MCA**\n• ~₹20,000–₹35,000/year (aided seats)\n\n**MBA**\n• ~₹50,000–₹75,000/year\n\n**M.Tech**\n• GATE scholars: ₹12,400/month fellowship\n• Non-GATE: ~₹25,000/year\n\n**Hostel**\n• ~₹2,000–₹4,000/month (includes meals)\n\n_For official and current fees, refer to the CUSAT website or official admission notification._",
-  scholarships: "CUSAT students have access to multiple scholarships:\n\n🏆 **Merit-Based**\n• University merit awards for toppers\n• Departmental awards for academic excellence\n\n💰 **Government Scholarships**\n• Kerala State Merit Scholarship\n• Post-Matric Scholarship (SC/ST/OBC)\n• Central Sector Scholarship for College & University Students\n• Merit-cum-Means Scholarship\n\n🎓 **Special Awards**\n• GATE Fellowship: ₹12,400/month for M.Tech students\n• Physically challenged student support\n• Sports achievement scholarships\n• Emergency financial assistance\n\nEligibility varies by category and academic performance. Would you like guidance on applying for a specific scholarship?",
-  hostel: "CUSAT has on-campus hostels on the Kalamassery campus:\n\n🏠 **Accommodation**\n• Separate hostels for male and female students\n• Rooms allocated on merit basis\n• ~₹2,000–₹4,000/month inclusive of meals\n\n✅ **Facilities**\n• 24-hour internet access\n• Nutritious meals in dining hall\n• Common recreation rooms\n• Sports and fitness facilities\n• Medical room and first aid\n\n🔒 **Safety**\n• 24-hour security, CCTV surveillance\n• Biometric entry for ladies' hostel\n• Resident warden round the clock\n\nHostel seats are limited and allocated on merit. Apply early after admission confirmation.",
-  apply: "Applying to CUSAT through the CUSAT CAT process:\n\n**1. Check Eligibility**\nVerify you meet academic requirements for your desired program\n\n**2. Register for CUSAT CAT**\nOnline registration through the official CUSAT portal during the notification window\n\n**3. Pay Application Fee**\nOnline payment of the registration fee\n\n**4. Appear for CAT**\nTake the CUSAT Common Admission Test on the scheduled date\n\n**5. Check Results**\nDownload your rank card from the results portal\n\n**6. Counselling**\nParticipate in centralised counselling for seat allotment\n\n**7. Report for Admission**\nSubmit original documents and pay fees\n\n_Note: Exact dates and process are released in the official CUSAT admission notification._",
-  placements: "CUSAT's Centre for Career Development & Placement:\n\n🏢 **Regular Campus Recruiters**\n• IT: TCS, Infosys, Wipro, Cognizant, UST Global\n• Consulting: Ernst & Young, KPMG, Deloitte\n• IBS Software, Experion Technologies\n\n📍 **Location Advantage**\n• Kalamassery campus is adjacent to Kochi's IT corridor\n• Infopark and SmartCity provide direct industry access\n• Internship opportunities with Kochi-based companies\n\n🎓 **Support**\n• Pre-placement training and aptitude coaching\n• Mock interviews and GD sessions\n• Industry interaction programs\n• Entrepreneurship Cell (E-Cell) for startups\n\nPlacement statistics vary by department and academic year.",
-};
-
-function getResponse(text: string): string {
-  const l = text.toLowerCase();
-  if (l.includes('course') || l.includes('program') || l.includes('available')) return aiResponses.courses;
-  if (l.includes('mca') || (l.includes('eligib') && l.includes('master'))) return aiResponses.mca;
-  if (l.includes('fee') || l.includes('cost') || l.includes('tuition')) return aiResponses.fees;
-  if (l.includes('scholarship') || l.includes('merit') || l.includes('financial')) return aiResponses.scholarships;
-  if (l.includes('hostel') || l.includes('accommodation') || l.includes('stay')) return aiResponses.hostel;
-  if (l.includes('apply') || l.includes('cat') || l.includes('application') || l.includes('how to')) return aiResponses.apply;
-  if (l.includes('placement') || l.includes('job') || l.includes('recruit') || l.includes('career')) return aiResponses.placements;
-  if (l.includes('eligib') || l.includes('require') || l.includes('qualify')) return aiResponses.mca;
-  return "Hello! I am the CUSAT Admission Assistant. I can help you with:\n\n• Courses & programs at CUSAT\n• Fee structure and scholarships\n• Hostel facilities on campus\n• Eligibility requirements\n• CUSAT CAT admission process\n• Placement opportunities\n\n_This is a demo assistant. For official information, please visit the CUSAT website._\n\nWhat would you like to know?";
-}
-
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -111,6 +88,7 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
   const [isTyping, setIsTyping] = useState(false);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [leadSubmitted, setLeadSubmitted] = useState(false);
+  const [submittingLead, setSubmittingLead] = useState(false);
   const [leadForm, setLeadForm] = useState<LeadForm>({ name: '', phone: '', email: '', course: '' });
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -164,14 +142,27 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
     setIsTyping(false);
   }
 };
-  const submitLead = (e: React.FormEvent) => {
+  const submitLead = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLeadSubmitted(true);
-    setTimeout(() => {
-      setShowLeadModal(false);
-      setLeadSubmitted(false);
-      setLeadForm({ name: '', phone: '', email: '', course: '' });
-    }, 2500);
+    setSubmittingLead(true);
+    try {
+      await apiClient.post(API_ENDPOINTS.leads.public, {
+        name: leadForm.name,
+        phone: leadForm.phone,
+        email: leadForm.email,
+        course: leadForm.course,
+      });
+      setLeadSubmitted(true);
+      setTimeout(() => {
+        setShowLeadModal(false);
+        setLeadSubmitted(false);
+        setLeadForm({ name: '', phone: '', email: '', course: '' });
+      }, 2500);
+    } catch (err) {
+      console.error('Failed to submit lead:', err);
+    } finally {
+      setSubmittingLead(false);
+    }
   };
 
   return (
@@ -468,9 +459,18 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
                   <p className="text-xs text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-100">
                     This is a demo form. Submitting will not send your details to CUSAT. This demonstrates AdmissionAI's lead capture capability.
                   </p>
-                  <button type="submit" className="w-full btn-primary flex items-center justify-center gap-2">
-                    <Users className="w-4 h-4" />
-                    Request Admission Assistance
+                  <button type="submit" disabled={submittingLead} className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50">
+                    {submittingLead ? (
+                      <>
+                        <div className="w-4.5 h-4.5 border-2 border-white/30 border-t-white rounded-full animate-spin" style={{ width: 18, height: 18 }} />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Users className="w-4 h-4" />
+                        Request Admission Assistance
+                      </>
+                    )}
                   </button>
                 </form>
               </>

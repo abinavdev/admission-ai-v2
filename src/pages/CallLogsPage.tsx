@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Clock, Play, Bot } from 'lucide-react';
 import { CallLog } from '../types';
 import { useCalls } from '../hooks/useCalls';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { useToast } from '../contexts/ToastContext';
 import { TableWrapper, DataTable } from '../components/ui/Table';
 import { CallStatusBadge } from '../components/ui/Badge';
@@ -26,11 +27,35 @@ function normalizeCall(c: Record<string, unknown>): CallLog {
 export function CallLogsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<CallLog | null>(null);
-  const { calls: rawCalls, loading, error, fetchCalls } = useCalls();
+  const { calls: rawCalls, loading, error, total, fetchCalls } = useCalls();
+  const { analytics, fetchAnalytics } = useAnalytics();
   const toast = useToast();
 
-  useEffect(() => { fetchCalls(); }, [fetchCalls]);
+  const ITEMS_PER_PAGE = 8;
+
+  const getActiveParams = useCallback(() => {
+    const params: Record<string, string> = {
+      page: String(page),
+      limit: String(ITEMS_PER_PAGE),
+    };
+    if (statusFilter !== 'All') {
+      params.status = statusFilter.toUpperCase();
+    }
+    if (search) {
+      params.search = search;
+    }
+    return params;
+  }, [page, statusFilter, search]);
+
+  useEffect(() => {
+    fetchCalls(getActiveParams()).catch(() => {});
+  }, [fetchCalls, getActiveParams]);
+
+  useEffect(() => {
+    fetchAnalytics().catch(() => {});
+  }, [fetchAnalytics]);
 
   useEffect(() => {
     if (error) toast(error, 'error');
@@ -38,11 +63,12 @@ export function CallLogsPage() {
 
   const callLogs = (rawCalls as unknown as Record<string, unknown>[]).map(normalizeCall);
 
-  const filtered = callLogs.filter((c) => {
-    const matchSearch = !search || c.studentName.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
-    const matchStatus = statusFilter === 'All' || c.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+
+  const completedCount = (analytics?.callsByStatus ?? []).find((s) => s.status === 'COMPLETED')?._count._all ?? 0;
+  const missedCount = (analytics?.callsByStatus ?? []).find((s) => s.status === 'MISSED')?._count._all ?? 0;
+  const voicemailCount = (analytics?.callsByStatus ?? []).find((s) => s.status === 'VOICEMAIL')?._count._all ?? 0;
+  const totalCallsCount = analytics?.overview?.totalCalls ?? total;
 
   const columns = [
     { key: 'id', header: 'Call ID', render: (row: CallLog) => <span className="text-xs font-mono text-slate-400">{row.id.slice(0, 8)}...</span> },
@@ -85,9 +111,9 @@ export function CallLogsPage() {
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)
         ) : (
           [
-            { label: 'Total Calls', value: callLogs.length, color: 'text-[#003B7A] bg-blue-50' },
-            { label: 'Completed', value: callLogs.filter((c) => c.status === 'Completed').length, color: 'text-emerald-700 bg-emerald-50' },
-            { label: 'Missed', value: callLogs.filter((c) => c.status !== 'Completed').length, color: 'text-red-600 bg-red-50' },
+            { label: 'Total Calls', value: totalCallsCount, color: 'text-[#003B7A] bg-blue-50' },
+            { label: 'Completed', value: completedCount, color: 'text-emerald-700 bg-emerald-50' },
+            { label: 'Missed / VM', value: missedCount + voicemailCount, color: 'text-red-600 bg-red-50' },
           ].map((stat) => (
             <div key={stat.label} className={`card p-4 text-center ${stat.color}`}>
               <div className="text-2xl font-bold">{stat.value}</div>
@@ -99,14 +125,14 @@ export function CallLogsPage() {
 
       <TableWrapper
         title="Call Logs"
-        count={filtered.length}
-        onSearch={(q) => setSearch(q)}
+        count={total}
+        onSearch={(q) => { setSearch(q); setPage(1); }}
         searchPlaceholder="Search by name or phone..."
         onExport={() => {}}
         actions={
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
             className="text-xs border border-slate-200 rounded-lg px-2 py-2 focus:outline-none focus:ring-1 focus:ring-[#003B7A] bg-white"
           >
             {statusOptions.map((s) => <option key={s}>{s}</option>)}
@@ -118,7 +144,22 @@ export function CallLogsPage() {
             <tbody>{Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} cols={6} />)}</tbody>
           </table>
         ) : (
-          <DataTable columns={columns} data={filtered} emptyMessage="No call logs found" />
+          <DataTable columns={columns} data={callLogs} emptyMessage="No call logs found" />
+        )}
+
+        {totalPages > 1 && (
+          <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-xs text-slate-400">
+              Showing {(page - 1) * ITEMS_PER_PAGE + 1}–{Math.min(page * ITEMS_PER_PAGE, total)} of {total}
+            </span>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 transition-colors">Previous</button>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => (
+                <button key={i} onClick={() => setPage(i + 1)} className={`w-8 h-8 text-xs rounded-lg transition-colors ${page === i + 1 ? 'bg-[#003B7A] text-white' : 'hover:bg-slate-50 border border-slate-200'}`}>{i + 1}</button>
+              ))}
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 transition-colors">Next</button>
+            </div>
+          </div>
         )}
       </TableWrapper>
 

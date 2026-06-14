@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { prisma } from '../config/database';
 import { success, error, paginated } from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
@@ -81,3 +81,24 @@ export async function deleteLead(req: AuthRequest, res: Response): Promise<void>
   await prisma.lead.delete({ where: { id: req.params.id } });
   success(res, { deleted: true });
 }
+
+export async function createPublicLead(req: Request, res: Response): Promise<void> {
+  const { name, phone, email, course } = req.body;
+  if (!name || !phone) {
+    error(res, 'Name and phone are required');
+    return;
+  }
+
+  const lead = await prisma.lead.create({
+    data: {
+      name,
+      phone,
+      email: email || '',
+      course: course || '',
+      status: 'NEW',
+      source: 'CHAT',
+    },
+  });
+  success(res, lead, 201);
+}
+

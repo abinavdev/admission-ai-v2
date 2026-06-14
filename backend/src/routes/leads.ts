@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { getLeads, createLead, updateLead, deleteLead, getLead } from '../controllers/leads';
+import { getLeads, createLead, updateLead, deleteLead, getLead, createPublicLead } from '../controllers/leads';
 import { authenticateUser } from '../middleware/auth';
 
 const router = Router();
 
+router.post('/public', createPublicLead);
 router.use(authenticateUser);
 router.get('/', getLeads);
 router.post('/', createLead);

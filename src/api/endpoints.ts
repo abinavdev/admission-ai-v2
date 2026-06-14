@@ -7,6 +7,7 @@ export const API_ENDPOINTS = {
   leads: {
     list: '/leads',
     detail: (id: string) => `/leads/${id}`,
+    public: '/leads/public',
   },
   chat: {
     ask: '/chat/ask',

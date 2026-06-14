@@ -1,4 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuthContext } from '../../contexts/AuthContext';
+import { apiClient } from '../../api/client';
+import { API_ENDPOINTS } from '../../api/endpoints';
 import {
   LayoutDashboard, MessageSquare, Phone, Users, PhoneCall,
   MessageCircle, BookOpen, BarChart3, Settings, Bot, UserCog,
@@ -36,9 +39,35 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentPage, onNavigate, isOpen, onClose }: SidebarProps) {
+  const { user } = useAuthContext();
+  const [leadsCount, setLeadsCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    apiClient.get<{ data: { totalLeads: number } }>(API_ENDPOINTS.dashboard.stats)
+      .then((res) => setLeadsCount(res.data.data.totalLeads))
+      .catch(() => {});
+  }, [currentPage]);
+
   const handleNav = (page: Page) => {
     onNavigate(page);
     onClose();
+  };
+
+  const dynamicNavItems = navItems.map((item) => {
+    if (item.page === 'leads') {
+      return { ...item, badge: leadsCount !== null ? String(leadsCount) : undefined };
+    }
+    return item;
+  });
+
+  const initials = user?.name
+    ? user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+    : 'U';
+
+  const formatRole = (role: string) => {
+    if (role === 'ADMIN') return 'Administrator';
+    if (role === 'ADMISSION_OFFICER') return 'Admission Officer';
+    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
   };
 
   return (
@@ -82,7 +111,7 @@ export function Sidebar({ currentPage, onNavigate, isOpen, onClose }: SidebarPro
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-          {navItems.map((item) => (
+          {dynamicNavItems.map((item) => (
             <button
               key={item.page}
               onClick={() => handleNav(item.page)}
@@ -112,11 +141,11 @@ export function Sidebar({ currentPage, onNavigate, isOpen, onClose }: SidebarPro
         <div className="px-3 py-3 border-t border-slate-100">
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
             <div className="w-8 h-8 rounded-full bg-[#003B7A] flex items-center justify-center text-white text-xs font-bold">
-              RK
+              {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-900 truncate">Dr. Suresh Kumar P</p>
-              <p className="text-xs text-slate-400 truncate">Administrator</p>
+              <p className="text-xs font-semibold text-slate-900 truncate">{user?.name || 'User'}</p>
+              <p className="text-xs text-slate-400 truncate">{user?.role ? formatRole(user.role) : 'Staff'}</p>
             </div>
           </div>
         </div>
