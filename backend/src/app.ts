@@ -14,11 +14,32 @@ import callsRoutes from './routes/calls';
 import analyticsRoutes from './routes/analytics';
 import dashboardRoutes from './routes/dashboard';
 
+import { env } from './config/env';
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://localhost:3000'
+];
+
+if (env.FRONTEND_URL) {
+  const urls = env.FRONTEND_URL.split(',').map(url => url.trim().replace(/\/$/, ''));
+  allowedOrigins.push(...urls);
+}
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:4173'],
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const normalizedOrigin = origin.replace(/\/$/, '');
+    if (allowedOrigins.includes(normalizedOrigin) || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 app.use(express.json());
@@ -34,8 +55,9 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok' });
 });
+
 
 app.use(errorHandler);
 

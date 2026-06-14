@@ -43,7 +43,8 @@ export async function askQuestion(req: Request, res: Response): Promise<void> {
       success(res, { answer: llmResp.answer, sourceCount: chunks.length });
       return;
     } catch (llmErr) {
-      console.error('Gemini failed:', llmErr?.message || llmErr);
+      const errorMsg = llmErr instanceof Error ? llmErr.message : String(llmErr);
+      console.error('Gemini failed:', errorMsg);
       // fallback to retrieval-based answer
       const fallback = buildAnswer(q, chunks);
       success(res, { answer: fallback, sourceCount: chunks.length, fallback: true });
