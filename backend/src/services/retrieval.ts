@@ -196,7 +196,9 @@ export async function retrieveRelevantChunks(
   try {
     semanticResults = await semanticSearch(question, 20);
   } catch (err) {
-    console.error('[Hybrid Retrieval] Semantic search failed, falling back to keyword search only:', err);
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error('[Hybrid Retrieval] Semantic search failed, falling back to keyword search only:', errorMsg);
+    console.log(`[Embedding Fallback Activated] Reason: ${errorMsg}`);
   }
 
   const semanticMap = new Map<string, any>();
@@ -290,10 +292,41 @@ export function buildAnswer(
   question: string,
   chunks: RetrievedChunk[]
 ): string {
-
   if (chunks.length === 0) {
     return 'I could not find that information in the uploaded university documents.';
   }
 
-  return chunks.slice(0, 3).map((c) => `Source: ${c.documentName} (chunk ${c.chunkIndex})\n${c.content}`).join('\n\n');
+  const docOrder: string[] = [];
+  const groups = new Map<string, string[]>();
+
+  for (const chunk of chunks) {
+    const docName = chunk.documentName;
+    if (!groups.has(docName)) {
+      groups.set(docName, []);
+      docOrder.push(docName);
+    }
+    groups.get(docName)!.push(chunk.content);
+  }
+
+  const parts: string[] = [];
+  const seen = new Set<string>();
+
+  for (const docName of docOrder) {
+    const contents = groups.get(docName) || [];
+    const docParts: string[] = [];
+    for (const content of contents) {
+      const sentences = content.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+      for (const s of sentences) {
+        const key = s.toLowerCase().replace(/\s+/g, ' ').slice(0, 300);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        docParts.push(s);
+      }
+    }
+    if (docParts.length > 0) {
+      parts.push(`Source: ${docName}\n${docParts.join(' ')}`);
+    }
+  }
+
+  return `I'm currently using information directly from the university knowledge base:\n\n` + parts.join('\n\n');
 }

@@ -84,6 +84,7 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', role: 'assistant', content: "Hello! I am the CUSAT Admission Assistant. I can help you with courses, admissions, fees, scholarships, hostels, placements, eligibility requirements, and application procedures.\n\n_Note: This is a demo assistant. For official information, please visit the CUSAT website._" },
   ]);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showLeadModal, setShowLeadModal] = useState(false);
@@ -115,8 +116,14 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
       API_ENDPOINTS.chat.ask,
       {
         question: text.trim(),
+        conversationId: conversationId || undefined,
       }
     );
+
+    const dbConvId = response.data?.data?.conversationId;
+    if (dbConvId) {
+      setConversationId(dbConvId);
+    }
 
     const aiMsg: Message = {
       id: (Date.now() + 1).toString(),

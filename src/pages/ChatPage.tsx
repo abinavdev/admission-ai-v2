@@ -91,6 +91,8 @@ export function ChatPage() {
   const sendMessage = async (text: string) => {
     if (!text.trim() || isTyping) return;
 
+    const isRealDbId = activeSessionId !== 'default' && activeSessionId.length > 13;
+
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -107,8 +109,15 @@ export function ChatPage() {
     setIsTyping(true);
 
     try {
-      const res = await apiClient.post<{ data: { answer: string } }>(API_ENDPOINTS.chat.ask, { question: text.trim() });
+      const res = await apiClient.post<{ data: { answer: string; conversationId: string } }>(
+        API_ENDPOINTS.chat.ask,
+        {
+          question: text.trim(),
+          conversationId: isRealDbId ? activeSessionId : undefined,
+        }
+      );
       const answer = res.data?.data?.answer ?? "I could not find that information in the uploaded university documents. Please contact the admissions office for confirmation.";
+      const dbConvId = res.data?.data?.conversationId;
 
       const aiMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -123,10 +132,15 @@ export function ChatPage() {
         const isUntitled = s.title === 'New Conversation' || s.title === 'CUSAT Enquiry';
         return {
           ...s,
+          id: dbConvId || s.id,
           title: isUntitled && s.messages.length <= 2 ? text.trim().slice(0, 40) : s.title,
           messages: [...s.messages, aiMsg],
         };
       }));
+
+      if (dbConvId) {
+        setActiveSessionId(dbConvId);
+      }
     } catch {
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
