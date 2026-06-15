@@ -66,9 +66,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const res = await apiClient.get<{ data: { user: AuthUser } }>(API_ENDPOINTS.auth.profile);
-        setUser(res.data.data.user);
-        localStorage.setItem('auth_user', JSON.stringify(res.data.data.user));
+        const res = await apiClient.get<{ data: AuthUser }>(API_ENDPOINTS.auth.profile);
+        setUser(res.data.data);
+        localStorage.setItem('auth_user', JSON.stringify(res.data.data));
       } catch (err) {
         console.error('Session validation failed:', err);
         localStorage.removeItem('auth_token');
