@@ -25,7 +25,7 @@ export async function getAnalytics(_req: AuthRequest, res: Response): Promise<vo
     callsByStatus,
   ] = await Promise.all([
     prisma.lead.count(),
-    prisma.chatSession.count(),
+    prisma.conversation.count({ where: { leadId: { not: null } } }),
     prisma.callLog.count(),
     prisma.document.count(),
     prisma.lead.groupBy({ by: ['status'], _count: { _all: true } }),

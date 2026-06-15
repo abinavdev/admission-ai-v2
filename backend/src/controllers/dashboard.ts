@@ -7,7 +7,7 @@ export async function getDashboardStats(_req: AuthRequest, res: Response): Promi
   const [totalLeads, totalCalls, totalChats, totalDocuments] = await Promise.all([
     prisma.lead.count(),
     prisma.callLog.count(),
-    prisma.chatSession.count(),
+    prisma.conversation.count({ where: { leadId: { not: null } } }),
     prisma.document.count(),
   ]);
 
