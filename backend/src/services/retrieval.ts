@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { semanticSearch } from './vectorSearch';
+import { env } from '../config/env';
 
 const STOP_WORDS = new Set([
   'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
@@ -251,22 +252,85 @@ export async function retrieveRelevantChunks(
     });
   });
 
-  // Sort by hybridScore descending and return top K
-  const sorted = hybridResults.sort((a, b) => b.hybridScore - a.hybridScore);
-  const results = sorted.slice(0, Math.max(3, topK));
+  // Filter by score threshold
+  const threshold = env.RETRIEVAL_SCORE_THRESHOLD !== undefined ? env.RETRIEVAL_SCORE_THRESHOLD : 0.20;
+  const maxChunksPerDoc = env.MAX_CHUNKS_PER_DOC !== undefined ? env.MAX_CHUNKS_PER_DOC : 2;
 
-  console.log('\n===== HYBRID TOP RESULTS =====');
-  results.forEach((result, index) => {
-    console.log(`\n#${index + 1}`);
-    console.log('Document:', result.documentName);
-    console.log(`Score (Hybrid): ${result.hybridScore.toFixed(4)} (Semantic: ${result.semanticScore.toFixed(4)}, Keyword: ${result.keywordScore.toFixed(4)})`);
-    console.log('Chunk:', result.chunkIndex);
-    console.log(result.content.substring(0, 250).replace(/\n/g, ' '));
+  const chunksBeforeFiltering = hybridResults.length;
+  const filteredResults = hybridResults.filter(r => r.hybridScore >= threshold);
+  const chunksAfterFiltering = filteredResults.length;
+  const removedResults = hybridResults.filter(r => r.hybridScore < threshold);
+  const chunksRemoved = removedResults.length;
+
+  console.log(`[Retrieval Diagnostics] Chunks Before Filtering: ${chunksBeforeFiltering}`);
+  console.log(`[Retrieval Diagnostics] Chunks After Filtering: ${chunksAfterFiltering}`);
+  console.log(`[Retrieval Diagnostics] Chunks Removed By Threshold: ${chunksRemoved}`);
+
+  // Group remaining chunks by document
+  const docsMap = new Map<string, RetrievedChunk[]>();
+  filteredResults.forEach(chunk => {
+    const docName = chunk.documentName;
+    if (!docsMap.has(docName)) {
+      docsMap.set(docName, []);
+    }
+    docsMap.get(docName)!.push(chunk);
   });
+
+  // Sort each document's chunks by score descending
+  const docSummaries: { docName: string; maxScore: number; chunks: RetrievedChunk[] }[] = [];
+  docsMap.forEach((chunks, docName) => {
+    const sortedChunks = chunks.sort((a, b) => b.hybridScore - a.hybridScore);
+    const maxScore = sortedChunks[0]?.hybridScore || 0;
+    docSummaries.push({ docName, maxScore, chunks: sortedChunks });
+  });
+
+  // Rank documents by highest chunk score descending
+  docSummaries.sort((a, b) => b.maxScore - a.maxScore);
+
+  // Round-robin selection limiting chunks per document
+  const selectedChunks: RetrievedChunk[] = [];
+  const limit = Math.max(3, topK);
+
+  for (let chunkIndex = 0; chunkIndex < maxChunksPerDoc; chunkIndex++) {
+    for (const doc of docSummaries) {
+      if (selectedChunks.length >= limit) {
+        break;
+      }
+      if (chunkIndex < doc.chunks.length) {
+        selectedChunks.push(doc.chunks[chunkIndex]);
+      }
+    }
+    if (selectedChunks.length >= limit) {
+      break;
+    }
+  }
+
+  // Diagnostics print
+  const selectedDocs = new Set(selectedChunks.map(c => c.documentName));
+
+  console.log('\nSelected Documents:');
+  selectedDocs.forEach(doc => {
+    console.log(`* ${doc}`);
+  });
+
+  console.log('\nChunks Removed By Threshold:');
+  if (removedResults.length === 0) {
+    console.log('(none)');
+  } else {
+    removedResults.sort((a, b) => b.hybridScore - a.hybridScore).forEach(r => {
+      console.log(`* Document: ${r.documentName} | Chunk: ${r.chunkIndex} | Score: ${r.hybridScore.toFixed(4)} (below threshold ${threshold.toFixed(2)})`);
+    });
+  }
+
+  console.log('\nFinal Context Chunks:');
+  selectedChunks.forEach((c, i) => {
+    console.log(`* Rank #${i + 1} | Document: ${c.documentName} | Chunk: ${c.chunkIndex} | Score: ${c.hybridScore.toFixed(4)} | Text: "${c.content.substring(0, 100).replace(/\n/g, ' ')}..."`);
+  });
+
   console.log('\n===============================\n');
   console.log('retrieval_time_ms=', Date.now() - start);
 
-  return results;
+  return selectedChunks;
 }
 
 export function buildContext(chunks: RetrievedChunk[], maxChars = 3000): string {

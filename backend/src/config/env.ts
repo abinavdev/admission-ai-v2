@@ -21,6 +21,8 @@ export const env = {
   GEMINI_EMBEDDING_MODEL: process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-2',
   GROQ_API_KEY: process.env.GROQ_API_KEY || '',
   GROQ_MODEL: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+  RETRIEVAL_SCORE_THRESHOLD: parseFloat(process.env.RETRIEVAL_SCORE_THRESHOLD || '0.20'),
+  MAX_CHUNKS_PER_DOC: parseInt(process.env.MAX_CHUNKS_PER_DOC || '2', 10),
   FRONTEND_URL: process.env.FRONTEND_URL || '',
 };
 
