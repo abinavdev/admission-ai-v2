@@ -7,10 +7,20 @@ export const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+type AuthErrorCallback = () => void;
+let authErrorCallback: AuthErrorCallback | null = null;
+
+export const registerAuthErrorCallback = (cb: AuthErrorCallback) => {
+  authErrorCallback = cb;
+};
+
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('auth_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const isPublic = config.url?.includes('/chat/ask') || config.url?.includes('/leads/public');
+  if (!isPublic) {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
   }
   return config;
 });
@@ -19,8 +29,15 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('auth_user');
+      const url = error.config?.url || '';
+      const isPublic = url.includes('/chat/ask') || url.includes('/leads/public');
+      if (!isPublic) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        if (authErrorCallback) {
+          authErrorCallback();
+        }
+      }
     }
     return Promise.reject(error);
   }

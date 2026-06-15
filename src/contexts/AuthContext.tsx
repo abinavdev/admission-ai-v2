@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import { apiClient } from '../api/client';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { apiClient, registerAuthErrorCallback } from '../api/client';
 import { API_ENDPOINTS } from '../api/endpoints';
 
 interface AuthUser {
@@ -28,7 +28,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return null;
     }
   });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(() => {
+    return !!localStorage.getItem('auth_token');
+  });
 
   const login = useCallback(async (email: string, password: string) => {
     setLoading(true);
@@ -50,6 +52,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
     setUser(null);
+  }, []);
+
+  useEffect(() => {
+    registerAuthErrorCallback(() => {
+      setUser(null);
+    });
+
+    const validateToken = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const res = await apiClient.get<{ data: { user: AuthUser } }>(API_ENDPOINTS.auth.profile);
+        setUser(res.data.data.user);
+        localStorage.setItem('auth_user', JSON.stringify(res.data.data.user));
+      } catch (err) {
+        console.error('Session validation failed:', err);
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    validateToken();
   }, []);
 
   return (

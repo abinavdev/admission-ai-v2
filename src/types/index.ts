@@ -1,5 +1,4 @@
 export type Page =
-  | 'landing'
   | 'login'
   | 'dashboard'
   | 'chat'

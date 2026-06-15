@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Page } from './types';
 import { AuthProvider, useAuthContext } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
-import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { DashboardPage } from './pages/DashboardPage';
@@ -24,17 +23,34 @@ const dashboardPages: Page[] = [
 ];
 
 function AppRoutes() {
-  const { isAuthenticated } = useAuthContext();
+  const { isAuthenticated, loading } = useAuthContext();
   const [currentPage, setCurrentPage] = useState<Page>(() => {
     const token = localStorage.getItem('auth_token');
     const user = localStorage.getItem('auth_user');
     if (token && user) return 'dashboard';
-    return 'landing';
+    return 'login';
   });
 
   const navigate = (page: Page) => setCurrentPage(page);
 
-  if (currentPage === 'landing') return <LandingPage onNavigate={navigate} />;
+  useEffect(() => {
+    if (currentPage === 'login' && isAuthenticated) {
+      setCurrentPage('dashboard');
+    } else if (dashboardPages.includes(currentPage) && !isAuthenticated) {
+      setCurrentPage('login');
+    }
+  }, [currentPage, isAuthenticated]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center font-sans">
+        <div className="w-10 h-10 border-4 border-[#003B7A]/30 border-t-[#003B7A] rounded-full animate-spin mb-4" />
+        <p className="text-sm text-slate-500 font-medium animate-pulse">Initializing session...</p>
+      </div>
+    );
+  }
+
+
   if (currentPage === 'login') return <LoginPage onNavigate={navigate} />;
   if (currentPage === 'student-portal') return <StudentPortalPage onNavigate={navigate} />;
 
@@ -57,7 +73,7 @@ function AppRoutes() {
     );
   }
 
-  return <LandingPage onNavigate={navigate} />;
+  return <LoginPage onNavigate={navigate} />;
 }
 
 function App() {

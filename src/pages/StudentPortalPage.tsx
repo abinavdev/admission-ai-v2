@@ -7,6 +7,7 @@ import {
 import { Page } from '../types';
 import { apiClient } from '../api/client';
 import { API_ENDPOINTS } from '../api/endpoints';
+import { useAuthContext } from '../contexts/AuthContext';
 
 interface StudentPortalProps {
   onNavigate: (page: Page) => void;
@@ -81,6 +82,7 @@ const faqs = [
 ];
 
 export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
+  const { isAuthenticated } = useAuthContext();
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', role: 'assistant', content: "Hello! I am the CUSAT Admission Assistant. I can help you with courses, admissions, fees, scholarships, hostels, placements, eligibility requirements, and application procedures.\n\n_Note: This is a demo assistant. For official information, please visit the CUSAT website._" },
   ]);
@@ -199,12 +201,15 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => onNavigate('landing')} className="text-xs text-slate-500 hover:text-slate-800 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors">
-              Back to Site
-            </button>
-            <button onClick={() => onNavigate('login')} className="btn-primary text-xs px-3 py-2">
-              Admin Login
-            </button>
+            {isAuthenticated ? (
+              <button onClick={() => onNavigate('dashboard')} className="btn-primary text-xs px-3 py-2">
+                Admin Dashboard
+              </button>
+            ) : (
+              <button onClick={() => onNavigate('login')} className="btn-primary text-xs px-3 py-2">
+                Admin Login
+              </button>
+            )}
           </div>
         </div>
       </nav>

@@ -5,7 +5,7 @@ import { API_ENDPOINTS } from '../../api/endpoints';
 import {
   LayoutDashboard, MessageSquare, Phone, Users, PhoneCall,
   MessageCircle, BookOpen, BarChart3, Settings, Bot, UserCog,
-  GraduationCap, ChevronRight, X, Zap, ExternalLink,
+  GraduationCap, ChevronRight, X, Zap, ExternalLink, LogOut,
 } from 'lucide-react';
 import { Page } from '../../types';
 
@@ -39,7 +39,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentPage, onNavigate, isOpen, onClose }: SidebarProps) {
-  const { user } = useAuthContext();
+  const { user, logout } = useAuthContext();
   const [leadsCount, setLeadsCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -139,14 +139,26 @@ export function Sidebar({ currentPage, onNavigate, isOpen, onClose }: SidebarPro
 
         {/* Footer */}
         <div className="px-3 py-3 border-t border-slate-100">
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
-            <div className="w-8 h-8 rounded-full bg-[#003B7A] flex items-center justify-center text-white text-xs font-bold">
-              {initials}
+          <div className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-[#003B7A] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                {initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-slate-900 truncate">{user?.name || 'User'}</p>
+                <p className="text-xs text-slate-400 truncate">{user?.role ? formatRole(user.role) : 'Staff'}</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-slate-900 truncate">{user?.name || 'User'}</p>
-              <p className="text-xs text-slate-400 truncate">{user?.role ? formatRole(user.role) : 'Staff'}</p>
-            </div>
+            <button
+              onClick={() => {
+                logout();
+                onNavigate('login');
+              }}
+              title="Logout"
+              className="p-1.5 hover:bg-red-50 hover:text-red-600 text-slate-400 rounded-lg transition-all duration-150 flex-shrink-0"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </aside>

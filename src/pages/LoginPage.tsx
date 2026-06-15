@@ -11,7 +11,7 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
   const { login } = useAuthContext();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('admin@admissionai.in');
-  const [password, setPassword] = useState('password');
+  const [password, setPassword] = useState('admin123');
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -140,12 +140,6 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
           <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
             <p className="text-xs text-[#003B7A] font-medium text-center">Demo credentials pre-filled above</p>
           </div>
-        </div>
-
-        <div className="text-center mt-6">
-          <button onClick={() => onNavigate('landing')} className="text-blue-200 text-sm hover:text-white transition-colors">
-            Back to website
-          </button>
         </div>
       </div>
     </div>
