@@ -25,6 +25,12 @@ const dashboardPages: Page[] = [
 function AppRoutes() {
   const { isAuthenticated, loading } = useAuthContext();
   const [currentPage, setCurrentPage] = useState<Page>(() => {
+    const path = window.location.pathname;
+    const hash = window.location.hash;
+    const search = window.location.search;
+    if (path === '/student' || path.includes('/student-portal') || hash === '#student' || search.includes('portal=student')) {
+      return 'student-portal';
+    }
     const token = localStorage.getItem('auth_token');
     const user = localStorage.getItem('auth_user');
     if (token && user) return 'dashboard';
