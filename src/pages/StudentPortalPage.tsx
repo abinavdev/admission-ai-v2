@@ -119,11 +119,12 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
         {
           question: text.trim(),
           conversationId: conversationId || undefined,
+          history: messages.map((m) => ({ role: m.role, content: m.content })),
         }
       );
 
       const dbConvId = response.data?.data?.conversationId;
-      if (dbConvId) {
+      if (dbConvId && dbConvId !== 'temp-session') {
         setConversationId(dbConvId);
       }
 
@@ -156,12 +157,19 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
     e.preventDefault();
     setSubmittingLead(true);
     try {
-      await apiClient.post(API_ENDPOINTS.leads.public, {
+      const response = await apiClient.post(API_ENDPOINTS.leads.public, {
         name: leadForm.name,
         phone: leadForm.phone,
         email: leadForm.email,
         course: leadForm.course,
+        chatHistory: messages.map((m) => ({ role: m.role, content: m.content })),
       });
+
+      const dbConvId = response.data?.data?.conversationId;
+      if (dbConvId) {
+        setConversationId(dbConvId);
+      }
+
       setLeadSubmitted(true);
       setTimeout(() => {
         setLeadSubmitted(false);

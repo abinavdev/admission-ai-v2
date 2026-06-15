@@ -16,27 +16,23 @@ export async function askQuestion(req: Request, res: Response): Promise<void> {
   const q = question.trim();
 
   try {
-    let conversation;
+    let isPersisted = false;
+    let dbConversation = null;
     let history: { role: string; content: string }[] = [];
 
     if (conversationId && typeof conversationId === 'string') {
-      conversation = await prisma.conversation.findUnique({
+      dbConversation = await prisma.conversation.findUnique({
         where: { id: conversationId },
       });
+      if (dbConversation && dbConversation.leadId) {
+        isPersisted = true;
+      }
     }
 
-    if (!conversation) {
-      // Create new conversation and set title to first 60 chars of user's first question
-      const title = q.substring(0, 60);
-      conversation = await prisma.conversation.create({
-        data: {
-          title,
-        },
-      });
-    } else {
+    if (isPersisted && dbConversation) {
       // Fetch the last 10 messages for the conversation history
       const dbMessages = await prisma.message.findMany({
-        where: { conversationId: conversation.id },
+        where: { conversationId: dbConversation.id },
         orderBy: { createdAt: 'desc' },
         take: 10,
       });
@@ -46,6 +42,14 @@ export async function askQuestion(req: Request, res: Response): Promise<void> {
         role: msg.role === 'user' ? 'user' : 'assistant',
         content: msg.content,
       }));
+    } else {
+      // For anonymous/temporary chats, use history passed in request body
+      if (Array.isArray(req.body.history)) {
+        history = req.body.history.map((h: any) => ({
+          role: h.role === 'user' ? 'user' : 'assistant',
+          content: h.content,
+        }));
+      }
     }
 
     // Rewrite search query to be self-contained using history
@@ -62,14 +66,16 @@ export async function askQuestion(req: Request, res: Response): Promise<void> {
     // Retrieve chunks using the rewritten query
     const chunks = await retrieveRelevantChunks(standaloneQuery, 8);
 
-    // Save the user's incoming message to the DB
-    await prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: 'user',
-        content: q,
-      },
-    });
+    // Save the user's incoming message ONLY if conversation is persisted
+    if (isPersisted && dbConversation) {
+      await prisma.message.create({
+        data: {
+          conversationId: dbConversation.id,
+          role: 'user',
+          content: q,
+        },
+      });
+    }
 
     // Build merged, deduped context
     const context = buildContext(chunks, 3000);
@@ -80,6 +86,8 @@ export async function askQuestion(req: Request, res: Response): Promise<void> {
     });
 
     console.log('Context length:', context.length);
+
+    const resConversationId = isPersisted && dbConversation ? dbConversation.id : (conversationId || 'temp-session');
 
     // Call Gemini LLM
     try {
@@ -93,16 +101,18 @@ export async function askQuestion(req: Request, res: Response): Promise<void> {
       console.log('LLM response time ms:', t1 - t0);
       console.log('LLM answer (truncated):', answer.substring(0, 800));
 
-      // Save the assistant's answer to the DB
-      await prisma.message.create({
-        data: {
-          conversationId: conversation.id,
-          role: 'assistant',
-          content: answer,
-        },
-      });
+      // Save the assistant's answer ONLY if conversation is persisted
+      if (isPersisted && dbConversation) {
+        await prisma.message.create({
+          data: {
+            conversationId: dbConversation.id,
+            role: 'assistant',
+            content: answer,
+          },
+        });
+      }
 
-      success(res, { answer, conversationId: conversation.id, sourceCount: chunks.length });
+      success(res, { answer, conversationId: resConversationId, sourceCount: chunks.length });
       return;
     } catch (llmErr) {
       const errorMsg = llmErr instanceof Error ? llmErr.message : String(llmErr);
@@ -121,16 +131,18 @@ export async function askQuestion(req: Request, res: Response): Promise<void> {
         console.log('Groq response time ms:', t1 - t0);
         console.log('Groq answer (truncated):', answer.substring(0, 800));
 
-        // Save the assistant's answer to the DB
-        await prisma.message.create({
-          data: {
-            conversationId: conversation.id,
-            role: 'assistant',
-            content: answer,
-          },
-        });
+        // Save the assistant's answer ONLY if conversation is persisted
+        if (isPersisted && dbConversation) {
+          await prisma.message.create({
+            data: {
+              conversationId: dbConversation.id,
+              role: 'assistant',
+              content: answer,
+            },
+          });
+        }
 
-        success(res, { answer, conversationId: conversation.id, sourceCount: chunks.length, provider: 'groq' });
+        success(res, { answer, conversationId: resConversationId, sourceCount: chunks.length, provider: 'groq' });
         return;
       } catch (groqErr) {
         const groqErrorMsg = groqErr instanceof Error ? groqErr.message : String(groqErr);
@@ -141,16 +153,18 @@ export async function askQuestion(req: Request, res: Response): Promise<void> {
         // fallback to retrieval-based answer
         const fallback = buildAnswer(q, chunks);
 
-        // Save the fallback assistant answer to the DB
-        await prisma.message.create({
-          data: {
-            conversationId: conversation.id,
-            role: 'assistant',
-            content: fallback,
-          },
-        });
+        // Save the fallback assistant answer ONLY if conversation is persisted
+        if (isPersisted && dbConversation) {
+          await prisma.message.create({
+            data: {
+              conversationId: dbConversation.id,
+              role: 'assistant',
+              content: fallback,
+            },
+          });
+        }
 
-        success(res, { answer: fallback, conversationId: conversation.id, sourceCount: chunks.length, fallback: true });
+        success(res, { answer: fallback, conversationId: resConversationId, sourceCount: chunks.length, fallback: true });
         return;
       }
     }
@@ -165,15 +179,40 @@ export async function getSessions(req: AuthRequest, res: Response): Promise<void
   const page = parseInt(req.query.page as string || '1', 10);
   const limit = parseInt(req.query.limit as string || '20', 10);
 
-  const [sessions, total] = await Promise.all([
-    prisma.chatSession.findMany({
+  const [conversations, total] = await Promise.all([
+    prisma.conversation.findMany({
+      where: {
+        leadId: { not: null },
+      },
+      include: {
+        lead: true,
+        messages: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
-      include: { _count: { select: { messages: true } } },
     }),
-    prisma.chatSession.count(),
+    prisma.conversation.count({
+      where: {
+        leadId: { not: null },
+      },
+    }),
   ]);
+
+  const sessions = conversations.map((c) => ({
+    id: c.id,
+    studentName: c.lead?.name || 'Student',
+    courseInterest: c.lead?.course || '',
+    createdAt: c.createdAt,
+    messages: c.messages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      createdAt: m.createdAt,
+    })),
+  }));
 
   paginated(res, sessions, total, page, limit);
 }
@@ -192,14 +231,35 @@ export async function createSession(req: AuthRequest, res: Response): Promise<vo
 }
 
 export async function getSession(req: AuthRequest, res: Response): Promise<void> {
-  const session = await prisma.chatSession.findUnique({
-    where: { id: req.params.id },
-    include: { messages: { orderBy: { createdAt: 'asc' } } },
+  const conversation = await prisma.conversation.findFirst({
+    where: {
+      id: req.params.id,
+      leadId: { not: null },
+    },
+    include: {
+      lead: true,
+      messages: { orderBy: { createdAt: 'asc' } },
+    },
   });
-  if (!session) {
+
+  if (!conversation) {
     error(res, 'Session not found', 404);
     return;
   }
+
+  const session = {
+    id: conversation.id,
+    studentName: conversation.lead?.name || 'Student',
+    courseInterest: conversation.lead?.course || '',
+    createdAt: conversation.createdAt,
+    messages: conversation.messages.map((m) => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      createdAt: m.createdAt,
+    })),
+  };
+
   success(res, session);
 }
 

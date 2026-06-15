@@ -83,22 +83,59 @@ export async function deleteLead(req: AuthRequest, res: Response): Promise<void>
 }
 
 export async function createPublicLead(req: Request, res: Response): Promise<void> {
-  const { name, phone, email, course } = req.body;
+  const { name, phone, email, course, chatHistory } = req.body;
   if (!name || !phone) {
     error(res, 'Name and phone are required');
     return;
   }
 
-  const lead = await prisma.lead.create({
-    data: {
-      name,
-      phone,
-      email: email || '',
-      course: course || '',
-      status: 'NEW',
-      source: 'CHAT',
-    },
-  });
-  success(res, lead, 201);
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Create the lead
+      const lead = await tx.lead.create({
+        data: {
+          name,
+          phone,
+          email: email || '',
+          course: course || '',
+          status: 'NEW',
+          source: 'CHAT',
+        },
+      });
+
+      // 2. Create the conversation
+      const conversation = await tx.conversation.create({
+        data: {
+          leadId: lead.id,
+          title: `Chat with ${lead.name}`,
+        },
+      });
+
+      // 3. Insert messages if chatHistory is provided
+      if (Array.isArray(chatHistory) && chatHistory.length > 0) {
+        const messagesData = chatHistory
+          .filter((msg: any) => msg && typeof msg.content === 'string' && msg.content.trim().length > 0)
+          .map((msg: any) => ({
+            conversationId: conversation.id,
+            role: msg.role === 'user' ? 'user' : 'assistant',
+            content: msg.content.trim(),
+          }));
+
+        if (messagesData.length > 0) {
+          await tx.message.createMany({
+            data: messagesData,
+          });
+        }
+      }
+
+      return { lead, conversationId: conversation.id };
+    });
+
+    success(res, result, 201);
+  } catch (err) {
+    console.error('Failed to create public lead with conversation:', err);
+    error(res, 'Failed to create lead');
+  }
 }
+
 

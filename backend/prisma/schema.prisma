@@ -37,6 +37,7 @@ model Lead {
   updatedAt    DateTime   @updatedAt @map("updated_at")
   assignedTo   String?    @map("assigned_to")
   assignedUser User?      @relation(fields: [assignedTo], references: [id], map: "leads_assignedTo_fkey")
+  conversations Conversation[]
 
   @@map("leads")
 }
@@ -144,6 +145,8 @@ enum CallStatus {
 model Conversation {
   id        String    @id @default(cuid())
   title     String?
+  leadId    String?   @map("lead_id")
+  lead      Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   messages  Message[]
