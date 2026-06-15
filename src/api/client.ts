@@ -34,6 +34,7 @@ apiClient.interceptors.response.use(
       if (!isPublic) {
         localStorage.removeItem('auth_token');
         localStorage.removeItem('auth_user');
+        localStorage.removeItem('current_page');
         if (authErrorCallback) {
           authErrorCallback();
         }

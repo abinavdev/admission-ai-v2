@@ -31,13 +31,31 @@ function AppRoutes() {
     if (path === '/student' || path.includes('/student-portal') || hash === '#student' || search.includes('portal=student')) {
       return 'student-portal';
     }
+
+    const savedPage = localStorage.getItem('current_page') as Page | null;
     const token = localStorage.getItem('auth_token');
     const user = localStorage.getItem('auth_user');
-    if (token && user) return 'dashboard';
+    const hasToken = !!(token && user);
+
+    if (savedPage && savedPage !== 'login' && savedPage !== 'landing') {
+      if (dashboardPages.includes(savedPage)) {
+        if (hasToken) return savedPage;
+      } else {
+        return savedPage;
+      }
+    }
+
+    if (hasToken) return 'dashboard';
     return 'login';
   });
 
   const navigate = (page: Page) => setCurrentPage(page);
+
+  useEffect(() => {
+    if (currentPage && currentPage !== 'login' && currentPage !== 'landing') {
+      localStorage.setItem('current_page', currentPage);
+    }
+  }, [currentPage]);
 
   useEffect(() => {
     if (currentPage === 'login' && isAuthenticated) {
