@@ -4,6 +4,7 @@ import { success, error, paginated } from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
 import { retrieveRelevantChunks, buildAnswer, buildContext } from '../services/retrieval';
 import { generateAnswerWithGemini, generateSearchQuery } from '../services/llm';
+import { generateAnswerWithGroq } from '../services/groq';
 
 export async function askQuestion(req: Request, res: Response): Promise<void> {
   const { question, conversationId } = req.body;
@@ -48,7 +49,13 @@ export async function askQuestion(req: Request, res: Response): Promise<void> {
     }
 
     // Rewrite search query to be self-contained using history
-    const standaloneQuery = await generateSearchQuery(q, history);
+    let standaloneQuery = q;
+    try {
+      standaloneQuery = await generateSearchQuery(q, history);
+    } catch (rewriteErr) {
+      console.error('Failed to rewrite search query:', rewriteErr);
+      standaloneQuery = q;
+    }
     console.log('Original Query:', q);
     console.log('Rewritten Standalone Query:', standaloneQuery);
 
@@ -100,21 +107,52 @@ export async function askQuestion(req: Request, res: Response): Promise<void> {
     } catch (llmErr) {
       const errorMsg = llmErr instanceof Error ? llmErr.message : String(llmErr);
       console.error('Gemini failed:', errorMsg);
-      console.log(`[Gemini Fallback Activated] Reason: ${errorMsg}`);
-      // fallback to retrieval-based answer
-      const fallback = buildAnswer(q, chunks);
+      console.log(`[Gemini Generation Failed] Reason: ${errorMsg}`);
+      console.log('[Groq Fallback Activated]');
 
-      // Save the fallback assistant answer to the DB
-      await prisma.message.create({
-        data: {
-          conversationId: conversation.id,
-          role: 'assistant',
-          content: fallback,
-        },
-      });
+      try {
+        console.log('Sending context to Groq with history...');
+        const t0 = Date.now();
+        const groqResp = await generateAnswerWithGroq(q, context, history);
+        const t1 = Date.now();
+        const answer = groqResp.answer;
 
-      success(res, { answer: fallback, conversationId: conversation.id, sourceCount: chunks.length, fallback: true });
-      return;
+        // Log details for debugging
+        console.log('Groq response time ms:', t1 - t0);
+        console.log('Groq answer (truncated):', answer.substring(0, 800));
+
+        // Save the assistant's answer to the DB
+        await prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            role: 'assistant',
+            content: answer,
+          },
+        });
+
+        success(res, { answer, conversationId: conversation.id, sourceCount: chunks.length, provider: 'groq' });
+        return;
+      } catch (groqErr) {
+        const groqErrorMsg = groqErr instanceof Error ? groqErr.message : String(groqErr);
+        console.error('Groq failed:', groqErrorMsg);
+        console.log(`[Groq Generation Failed] Reason: ${groqErrorMsg}`);
+        console.log('[Knowledge Base Fallback Activated]');
+
+        // fallback to retrieval-based answer
+        const fallback = buildAnswer(q, chunks);
+
+        // Save the fallback assistant answer to the DB
+        await prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            role: 'assistant',
+            content: fallback,
+          },
+        });
+
+        success(res, { answer: fallback, conversationId: conversation.id, sourceCount: chunks.length, fallback: true });
+        return;
+      }
     }
   } catch (err) {
     console.error('Retrieval error:', err);

@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { env } from '../config/env';
+import { generateSearchQueryWithGroq } from './groq';
 
 export interface LLMResponse {
   answer: string;
@@ -11,11 +12,18 @@ const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 console.log('Gemini initialized');
 console.log('API Key Loaded:', !!env.GEMINI_API_KEY);
 
+export const geminiConfig = {
+  simulateFailure: false
+};
+
 export async function generateAnswerWithGemini(
   question: string,
   context: string,
   history: { role: string; content: string }[] = []
 ): Promise<LLMResponse> {
+  if (geminiConfig.simulateFailure) {
+    throw new Error('Simulated Gemini failure (e.g. Rate Limit / Quota Exceeded)');
+  }
   const model = env.GEMINI_MODEL || 'gemini-2.5-flash';
 
   const historyText = history.length > 0
@@ -71,19 +79,90 @@ ${question}`;
   return { answer: String(text).trim(), raw: response };
 }
 
+export function checkAndRewriteQuery(
+  query: string,
+  history: { role: string; content: string }[] = []
+): { rewritten: string; path: string } | null {
+  const clean = query.trim().replace(/[?.,!]/g, '').toLowerCase();
+
+  // Regex to match a course name (with optional specialization)
+  const coursePattern = /\b(mca|mba|mtech|btech|m\.tech|b\.tech|m\.sc|msc)(?:\s+(?:cse|computer\s+science(?:\s+and\s+engineering)?|it|information\s+technology|ece|electronics(?:\s+and\s+communication(?:\s+engineering)?)?|mechanical|civil|data\s+science|cyber\s+security|artificial\s+intelligence|data\s+analytics))?\b/i;
+
+  // 1. Detect broad query prefixes or exact matches
+  const broadPrefixes = [
+    /^\s*(tell\s+me\s+about|explain|what\s+is|info|information\s+about|details\s+on|guide\s+for|course\s+details\s+for|admission\s+details\s+for)\s+(.+)$/i,
+    /^(.+)\s+(?:course|program|degree)\s*(?:details|info|information)?$/i
+  ];
+
+  // Check exact course match
+  const exactMatch = clean.match(new RegExp(`^${coursePattern.source}$`, 'i'));
+  if (exactMatch) {
+    const course = exactMatch[0].toUpperCase();
+    return {
+      rewritten: `${course} course details duration eligibility fees placements admission`,
+      path: '[Query Rewrite] Broad query detected'
+    };
+  }
+
+  for (const regex of broadPrefixes) {
+    const match = clean.match(regex);
+    if (match) {
+      const target = match[2] || match[1];
+      const courseMatch = target.match(new RegExp(`^${coursePattern.source}$`, 'i'));
+      if (courseMatch) {
+        const course = courseMatch[0].toUpperCase();
+        return {
+          rewritten: `${course} course details duration eligibility fees placements admission`,
+          path: '[Query Rewrite] Broad query detected'
+        };
+      }
+    }
+  }
+
+  // 2. Check if the query is self-contained (contains a course AND a specific attribute)
+  const attributeKeywords = /\b(fee|fees|cost|tuition|placement|placements|jobs|salary|package|eligibility|eligible|duration|years|admission|mode|entrance|hostel|hostels|accommodation|scholarship|scholarships|grant)\b/i;
+  const followUpMarkers = /\b(it|its|they|their|them|he|she|him|her|this|that|these|those|what\s+about|how\s+about)\b/i;
+
+  const hasCourse = coursePattern.test(clean);
+  const hasAttribute = attributeKeywords.test(clean);
+  const hasFollowUpMarker = followUpMarkers.test(clean);
+
+  if (hasCourse && hasAttribute && !hasFollowUpMarker) {
+    return {
+      rewritten: query,
+      path: '[Query Rewrite] Self-contained query unchanged'
+    };
+  }
+
+  // 3. If history is empty and it wasn't detected as broad or self-contained:
+  if (!history || history.length === 0) {
+    return {
+      rewritten: query,
+      path: '[Query Rewrite] Self-contained query unchanged'
+    };
+  }
+
+  return null;
+}
+
 export async function generateSearchQuery(
   question: string,
   history: { role: string; content: string }[]
 ): Promise<string> {
-  if (!history || history.length === 0) return question;
+  try {
+    const codeRewrite = checkAndRewriteQuery(question, history);
+    if (codeRewrite) {
+      console.log(codeRewrite.path);
+      return codeRewrite.rewritten;
+    }
 
-  const model = env.GEMINI_MODEL || 'gemini-2.5-flash';
-  const historyText = history
-    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-    .join('\n');
+    const model = env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const historyText = history
+      .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+      .join('\n');
 
-  const prompt = `Given the following conversation history and a follow-up question, generate a standalone search query that contains all necessary keywords to retrieve relevant information from a database.
-Do not write an answer. Only return the search query keywords.
+    const prompt = `You are a search query rewriter for a university admission assistant. Given the following conversation history and a follow-up question, generate a standalone search query.
+Do not write an answer. Only return the search query.
 
 Conversation History:
 ${historyText}
@@ -93,17 +172,39 @@ ${question}
 
 Standalone Search Query:`;
 
-  try {
-    const response = await ai.models.generateContent({
-      model,
-      contents: prompt,
-    });
-    const text = (response as any)?.text ?? (response as any)?.output?.[0]?.content ?? question;
-    return text.trim();
-  } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    console.error('Failed to generate standalone search query:', errorMsg);
-    console.log(`[Query Rewrite Fallback Activated] Reason: ${errorMsg}`);
+    try {
+      if (geminiConfig.simulateFailure) {
+        throw new Error('Simulated Gemini failure (e.g. Rate Limit / Quota Exceeded)');
+      }
+      const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+      });
+      const text = (response as any)?.text ?? (response as any)?.output?.[0]?.content ?? question;
+      console.log('[Query Rewrite] History-based rewrite via Gemini');
+      return text.trim();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error('Failed to generate standalone search query with Gemini:', errorMsg);
+      console.log(`[Gemini Generation Failed] Reason: ${errorMsg}`);
+      console.log('[Groq Fallback Activated]');
+
+      try {
+        const rewritten = await generateSearchQueryWithGroq(question, history);
+        console.log('[Query Rewrite] History-based rewrite via Groq');
+        return rewritten;
+      } catch (groqErr) {
+        const groqErrorMsg = groqErr instanceof Error ? groqErr.message : String(groqErr);
+        console.error('Failed to generate standalone search query with Groq:', groqErrorMsg);
+        console.log(`[Groq Generation Failed] Reason: ${groqErrorMsg}`);
+        console.log('[Query Rewrite] Raw query fallback');
+        return question;
+      }
+    }
+  } catch (outerErr) {
+    const errorMsg = outerErr instanceof Error ? outerErr.message : String(outerErr);
+    console.error('Unexpected error in generateSearchQuery:', errorMsg);
+    console.log('[Query Rewrite] Raw query fallback');
     return question;
   }
 }
