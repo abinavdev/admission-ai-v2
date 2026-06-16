@@ -54,11 +54,14 @@ export async function uploadDocument(req: AuthRequest, res: Response): Promise<v
 }
 
 export async function getDocumentStats(_req: AuthRequest, res: Response): Promise<void> {
-  const [totalChunks, failedCount] = await Promise.all([
+  const [totalChunks, failedCount, processedCount, totalDocuments, processingCount] = await Promise.all([
     prisma.documentChunk.count(),
     prisma.document.count({ where: { status: 'FAILED' } }),
+    prisma.document.count({ where: { status: 'PROCESSED' } }),
+    prisma.document.count(),
+    prisma.document.count({ where: { status: 'PROCESSING' } }),
   ]);
-  success(res, { totalChunks, failedCount });
+  success(res, { totalChunks, failedCount, processedCount, totalDocuments, processingCount });
 }
 
 export async function deleteDocument(req: AuthRequest, res: Response): Promise<void> {

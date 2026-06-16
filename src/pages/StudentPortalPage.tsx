@@ -52,13 +52,13 @@ const PORTAL_CONFIG = {
   ],
   faqs: [
     { q: 'How do I apply for admissions?', a: 'Applications can be submitted online through our admissions portal. You will need to register, fill out the application form, upload required academic documents, and pay the registration fee.' },
-    { q: 'What is the eligibility for the MCA program?', a: 'Candidates must have a Bachelor\'s degree in Computer Applications, Computer Science, or a related discipline with Mathematics as a subject at the 10+2 or graduation level, with minimum 50% aggregate marks.' },
+    { q: 'What is B.Tech Information Technology?', a: 'The B.Tech program in Information Technology is offered through the School of Engineering, CUSAT. The program combines theory, laboratory work, project experience, and industry-oriented learning, with a duration of 4 years (8 semesters).' },
     { q: 'Are hostel facilities available for all students?', a: 'Yes, on-campus boys and girls hostel facilities are available. Hostel allotment is merit-based and subject to seat availability. Applications can be submitted after confirming admission.' },
     { q: 'Are scholarships offered?', a: 'Yes, we offer various merit-based scholarships, financial aid for economically weaker sections, and government-sponsored category scholarships.' },
   ],
   suggestedQuestions: [
     'What courses are available?',
-    'What is MCA eligibility?',
+    'What is B.Tech Information Technology?',
     'What are the placement opportunities?',
     'What scholarships are available?',
   ]
@@ -734,9 +734,15 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
   const faqSectionRef = useRef<HTMLDivElement>(null);
   const contactSectionRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
   }, [messages, isTyping]);
 
   const sendMessage = async (text: string) => {
@@ -1159,7 +1165,7 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
           </div>
 
           {/* Messages Box */}
-          <div className="h-[400px] overflow-y-auto p-5 space-y-4 bg-slate-50/50 flex flex-col">
+          <div ref={chatContainerRef} className="h-[400px] overflow-y-auto p-5 space-y-4 bg-slate-50/50 flex flex-col">
             {messages.map((msg) => (
               <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {msg.role === 'assistant' && (

@@ -8,7 +8,7 @@ import { API_ENDPOINTS } from '../api/endpoints';
 
 const suggestedQuestions = [
   'What courses are available?',
-  'What is the MCA eligibility?',
+  'What is B.Tech Information Technology?',
   'Are scholarships available?',
   'What are the hostel facilities?',
   'How can I apply to CUSAT?',
