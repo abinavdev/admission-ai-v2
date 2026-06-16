@@ -308,16 +308,9 @@ admission-ai-v2/
 
 ### Student Portal
 
-<<<<<<< HEAD
-![Student Portal 3](screenshorts/Student%20Portal3.png)
-![Student Portal 1](screenshorts/Student%20Portal1.png)
-![Student Portal 2](screenshorts/Student%20Portal2.png)
-
-=======
 ![Student Portal 1](screenshots/Student%20Portal1.png)
 ![Student Portal 2](screenshots/Student%20Portal2.png)
 ![Student Portal 3](screenshots/Student%20Portal3.png)
->>>>>>> ab72b12 (Added SS to Readme)
 
 ### Admin Dashboard
 
