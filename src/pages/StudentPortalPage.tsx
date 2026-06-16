@@ -99,8 +99,31 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
   const [speechError, setSpeechError] = useState<string | null>(null);
   const [showVoiceSettings, setShowVoiceSettings] = useState(false);
 
+  // Continuous Voice Mode States
+  const [isContinuousMode, setIsContinuousMode] = useState(false);
+  const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'processing' | 'speaking' | 'error'>('idle');
+  const [continuousDuration, setContinuousDuration] = useState(0);
+  const [silenceSeconds, setSilenceSeconds] = useState(0);
+
   const recognitionRef = useRef<any>(null);
   const speakRef = useRef<any>(null);
+
+  // Refs to allow async closures to access fresh state values
+  const isContinuousModeRef = useRef(false);
+  const voiceStateRef = useRef<'idle' | 'listening' | 'processing' | 'speaking' | 'error'>('idle');
+  const voiceResponsesRef = useRef(true);
+
+  useEffect(() => {
+    isContinuousModeRef.current = isContinuousMode;
+  }, [isContinuousMode]);
+
+  useEffect(() => {
+    voiceStateRef.current = voiceState;
+  }, [voiceState]);
+
+  useEffect(() => {
+    voiceResponsesRef.current = voiceResponses;
+  }, [voiceResponses]);
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -119,10 +142,41 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
         window.speechSynthesis.cancel();
       }
       if (recognitionRef.current) {
-        recognitionRef.current.abort();
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {}
       }
     };
   }, []);
+
+  // Continuous Mode Duration and Silence Tracker
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isContinuousMode) {
+      interval = setInterval(() => {
+        setContinuousDuration((prev) => prev + 1);
+
+        if (voiceState === 'listening') {
+          setSilenceSeconds((prev) => {
+            const next = prev + 1;
+            if (next >= 60) {
+              // Pause voice mode after 60 seconds of silence
+              pauseVoiceMode();
+              return 0;
+            }
+            return next;
+          });
+        }
+      }, 1000);
+    } else {
+      setContinuousDuration(0);
+      setSilenceSeconds(0);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isContinuousMode, voiceState]);
 
   const cleanMarkdownForSpeech = (text: string): string => {
     if (!text) return '';
@@ -232,11 +286,19 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
     window.speechSynthesis.cancel();
     setIsSpeaking(false);
 
-    if (!voiceResponses && !force) return;
+    // If not in continuous mode, respect the voiceResponses config (unless forced)
+    if (!isContinuousModeRef.current && !voiceResponses && !force) return;
 
     try {
       const cleaned = cleanMarkdownForSpeech(text);
-      if (!cleaned) return;
+      if (!cleaned) {
+        if (isContinuousModeRef.current) {
+          setSilenceSeconds(0);
+          setVoiceState('listening');
+          startListeningLoop();
+        }
+        return;
+      }
 
       const utterance = new SpeechSynthesisUtterance(cleaned);
       speakRef.current = utterance;
@@ -253,14 +315,51 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
       utterance.pitch = 1.25;
       utterance.volume = 1;
 
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
+      utterance.onstart = () => {
+        setIsSpeaking(true);
+        if (isContinuousModeRef.current) {
+          setVoiceState('speaking');
+        }
+      };
+
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        if (isContinuousModeRef.current) {
+          setSilenceSeconds(0);
+          setVoiceState('listening');
+          // Add 500ms delay before restarting listening loop to prevent self-echo
+          setTimeout(() => {
+            if (isContinuousModeRef.current && voiceStateRef.current === 'listening') {
+              startListeningLoop();
+            }
+          }, 500);
+        } else {
+          setVoiceState('idle');
+        }
+      };
+
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        if (isContinuousModeRef.current) {
+          setSilenceSeconds(0);
+          setVoiceState('listening');
+          startListeningLoop();
+        } else {
+          setVoiceState('idle');
+        }
+      };
 
       window.speechSynthesis.speak(utterance);
     } catch (err) {
       console.error('Speech synthesis failed:', err);
       setIsSpeaking(false);
+      if (isContinuousModeRef.current) {
+        setSilenceSeconds(0);
+        setVoiceState('listening');
+        startListeningLoop();
+      } else {
+        setVoiceState('idle');
+      }
     }
   };
 
@@ -269,6 +368,9 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
       window.speechSynthesis.cancel();
     }
     setIsSpeaking(false);
+    if (isContinuousMode) {
+      setVoiceState('idle');
+    }
   };
 
   const replayLastResponse = () => {
@@ -279,6 +381,205 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
     }
   };
 
+  // Continuous Mode Action Handlers
+  const startContinuousVoiceMode = () => {
+    if (!speechSupported) {
+      setSpeechError('Speech recognition is not supported in this browser.');
+      return;
+    }
+    
+    // Stop any active single recognition or TTS first
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    
+    setIsContinuousMode(true);
+    setContinuousDuration(0);
+    setSilenceSeconds(0);
+    setVoiceState('speaking');
+
+    // Add greeting and trigger speak.
+    // The onend of this greeting will naturally start the startListeningLoop()
+    speak("Hello, I'm the AdmissionAI voice counselor. How can I help you today?", true);
+  };
+
+  const stopContinuousVoiceMode = () => {
+    setIsContinuousMode(false);
+    setVoiceState('idle');
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {}
+    }
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  };
+
+  const pauseVoiceMode = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {}
+    }
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setVoiceState('idle');
+  };
+
+  const resumeVoiceMode = () => {
+    setSilenceSeconds(0);
+    setVoiceState('listening');
+    startListeningLoop();
+  };
+
+  const interruptSpeaking = () => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (isContinuousMode) {
+      setSilenceSeconds(0);
+      setVoiceState('listening');
+      startListeningLoop();
+    }
+  };
+
+  const startListeningLoop = () => {
+    if (!speechSupported) return;
+    
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {}
+    }
+
+    try {
+      const rec = new SpeechRecognition();
+      recognitionRef.current = rec;
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = 'en-US';
+
+      rec.onstart = () => {
+        setIsListening(true);
+        setVoiceState('listening');
+        setSilenceSeconds(0);
+        setSpeechError(null);
+      };
+
+      rec.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setSilenceSeconds(0);
+        if (transcript.trim()) {
+          sendContinuousMessage(transcript);
+        }
+      };
+
+      rec.onerror = (event: any) => {
+        console.error('Continuous speech recognition error:', event.error);
+        if (event.error === 'no-speech') {
+          // Keep loop alive
+          return;
+        }
+        if (event.error === 'not-allowed') {
+          setSpeechError('Microphone permission denied.');
+          setVoiceState('error');
+          setIsContinuousMode(false);
+        }
+      };
+
+      rec.onend = () => {
+        setIsListening(false);
+        // Auto-restart if we are still in continuous mode and listening state
+        if (isContinuousModeRef.current && voiceStateRef.current === 'listening') {
+          setTimeout(() => {
+            if (isContinuousModeRef.current && voiceStateRef.current === 'listening') {
+              try {
+                recognitionRef.current?.start();
+              } catch (e) {
+                console.error("Failed to restart speech recognition:", e);
+              }
+            }
+          }, 300);
+        }
+      };
+
+      rec.start();
+    } catch (err) {
+      console.error('Failed to start recognition loop:', err);
+    }
+  };
+
+  const sendContinuousMessage = async (text: string) => {
+    if (!text.trim()) return;
+
+    setVoiceState('processing');
+    
+    // Stop recognition during processing
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {}
+    }
+
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: text.trim(),
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setIsTyping(true);
+
+    try {
+      const response = await apiClient.post(
+        API_ENDPOINTS.chat.ask,
+        {
+          question: text.trim(),
+          conversationId: conversationId || undefined,
+          history: messages.map((m) => ({ role: m.role, content: m.content })),
+        }
+      );
+
+      const dbConvId = response.data?.data?.conversationId;
+      if (dbConvId && dbConvId !== 'temp-session') {
+        setConversationId(dbConvId);
+      }
+
+      const aiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: response.data?.data?.answer || 'No answer found.',
+      };
+
+      setMessages((prev) => [...prev, aiMsg]);
+      
+      // Speak the response
+      setVoiceState('speaking');
+      speak(aiMsg.content);
+    } catch (err) {
+      console.error(err);
+      const aiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: 'Sorry, I could not connect to the knowledge base.',
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+      setVoiceState('speaking');
+      speak(aiMsg.content);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  // Push-to-talk Speech Recognition
   const startSpeechRecognition = () => {
     if (!speechSupported) {
       setSpeechError('Speech recognition is not supported in this browser.');
@@ -342,7 +643,7 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
       setIsListening(false);
     }
   };
-  
+
   const chatSectionRef = useRef<HTMLDivElement>(null);
   const faqSectionRef = useRef<HTMLDivElement>(null);
   const contactSectionRef = useRef<HTMLDivElement>(null);
@@ -354,6 +655,10 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
 
   const sendMessage = async (text: string) => {
     if (!text.trim()) return;
+
+    if (isContinuousMode) {
+      stopContinuousVoiceMode();
+    }
 
     // Stop speaking when user sends a new message
     if (window.speechSynthesis) {
@@ -456,6 +761,13 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
     { label: 'Scholarships', icon: <Award className="w-5 h-5 text-purple-600" />, question: 'What scholarships are available?' },
   ];
 
+  const formatDuration = (secs: number): string => {
+    const h = Math.floor(secs / 3600).toString().padStart(2, '0');
+    const m = Math.floor((secs % 3600) / 60).toString().padStart(2, '0');
+    const s = (secs % 60).toString().padStart(2, '0');
+    return `${h}:${m}:${s}`;
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       {/* Minimal Top Navbar */}
@@ -543,7 +855,115 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
         </section>
 
         {/* 3 & 4. Chat Assistant & Suggested Questions */}
-        <section ref={chatSectionRef} className="bg-white border border-slate-100 rounded-3xl shadow-card overflow-hidden">
+        <section ref={chatSectionRef} className="relative bg-white border border-slate-100 rounded-3xl shadow-card overflow-hidden">
+          {/* Continuous Voice Overlay */}
+          {isContinuousMode && (
+            <div 
+              onClick={voiceState === 'speaking' ? interruptSpeaking : undefined}
+              className="absolute inset-0 bg-slate-900/95 backdrop-blur-md z-50 flex flex-col items-center justify-between p-8 text-white animate-fade-in cursor-default"
+            >
+              {/* Header with Title and Timer */}
+              <div className="w-full flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
+                  <span className="text-xs font-bold tracking-wider uppercase opacity-80 flex items-center gap-1">
+                    🎙 Voice Conversation
+                  </span>
+                </div>
+                <div className="font-mono text-sm tracking-widest opacity-80 bg-slate-800/60 px-3 py-1 rounded-lg border border-slate-700/30">
+                  {formatDuration(continuousDuration)}
+                </div>
+              </div>
+
+              {/* Central State Animator */}
+              <div className="flex flex-col items-center justify-center space-y-6 my-auto">
+                {/* Visual Circle */}
+                <div 
+                  className={`w-28 h-28 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700/50 transition-all duration-300 relative ${
+                    voiceState === 'listening' ? 'mic-pulse bg-emerald-600/20 border-emerald-500' : ''
+                  }`}
+                >
+                  {voiceState === 'listening' && (
+                    <Mic className="w-10 h-10 text-emerald-400 animate-pulse" />
+                  )}
+                  {voiceState === 'processing' && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce" />
+                      <span className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+                      <span className="w-2.5 h-2.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]" />
+                    </div>
+                  )}
+                  {voiceState === 'speaking' && (
+                    <div className="flex items-end gap-1.5 h-12">
+                      <div className="w-1.5 bg-indigo-400 rounded-full soundwave-bar" style={{ height: '8px' }} />
+                      <div className="w-1.5 bg-indigo-400 rounded-full soundwave-bar" style={{ height: '20px' }} />
+                      <div className="w-1.5 bg-indigo-400 rounded-full soundwave-bar" style={{ height: '40px' }} />
+                      <div className="w-1.5 bg-indigo-400 rounded-full soundwave-bar" style={{ height: '16px' }} />
+                      <div className="w-1.5 bg-indigo-400 rounded-full soundwave-bar" style={{ height: '30px' }} />
+                    </div>
+                  )}
+                  {voiceState === 'idle' && (
+                    <VolumeX className="w-10 h-10 text-slate-400" />
+                  )}
+                  {voiceState === 'error' && (
+                    <span className="text-red-400 text-3xl font-bold">!</span>
+                  )}
+                </div>
+
+                {/* Status Texts */}
+                <div className="text-center space-y-2">
+                  <h3 className="text-lg font-bold capitalize tracking-tight">
+                    {voiceState === 'listening' && 'Listening'}
+                    {voiceState === 'processing' && 'Thinking'}
+                    {voiceState === 'speaking' && 'Speaking'}
+                    {voiceState === 'idle' && 'Paused'}
+                    {voiceState === 'error' && 'Voice Error'}
+                  </h3>
+                  <p className="text-xs text-slate-400 max-w-xs leading-relaxed mx-auto">
+                    {voiceState === 'listening' && (
+                      silenceSeconds >= 30 ? 'Still listening...' :
+                      silenceSeconds >= 10 ? "I'm listening..." :
+                      'Speak now, I am listening...'
+                    )}
+                    {voiceState === 'processing' && 'Formulating admission response...'}
+                    {voiceState === 'speaking' && 'Tap anywhere to interrupt speech'}
+                    {voiceState === 'idle' && 'Silence timeout. Tap Resume to continue.'}
+                    {voiceState === 'error' && (speechError || 'Speech synthesis/recognition failed.')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Bottom Controls */}
+              <div className="w-full flex items-center justify-center gap-4">
+                {/* Resume Button (Only visible if paused/idle) */}
+                {voiceState === 'idle' && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      resumeVoiceMode();
+                    }}
+                    className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition-all text-white text-xs font-bold rounded-xl shadow-md cursor-pointer"
+                  >
+                    Resume Conversation
+                  </button>
+                )}
+
+                {/* End Button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    stopContinuousVoiceMode();
+                  }}
+                  className="px-6 py-2.5 bg-red-600 hover:bg-red-500 active:scale-95 transition-all text-white text-xs font-bold rounded-xl shadow-md cursor-pointer"
+                >
+                  End Conversation
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Chat Header */}
           <div className="bg-[#003B7A] px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -561,6 +981,16 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
 
             {/* Voice Controls and Settings Dropdown */}
             <div className="flex items-center gap-2 relative">
+              {/* Start Continuous Voice Mode Button */}
+              <button
+                type="button"
+                onClick={startContinuousVoiceMode}
+                title="Start Continuous Voice Conversation"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-md active:scale-95 font-semibold"
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Voice Mode</span>
+              </button>
               {/* Voice Responses Auto-Play Indicator/Mute Toggle */}
               <button
                 type="button"
