@@ -3,6 +3,7 @@ import {
   GraduationCap, Bot, User, Send, Check,
   Coins, ClipboardList, Briefcase, Home, Award,
   Phone, Mail, MapPin, ChevronDown,
+  Mic, MicOff, Volume2, VolumeX, Square, RotateCcw, Settings,
 } from 'lucide-react';
 import { Page } from '../types';
 import { apiClient } from '../api/client';
@@ -90,6 +91,257 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
   const [submittingLead, setSubmittingLead] = useState(false);
   const [leadForm, setLeadForm] = useState<LeadForm>({ name: '', phone: '', email: '', course: '' });
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [voiceResponses, setVoiceResponses] = useState(true);
+  const [autoSend, setAutoSend] = useState(true);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+
+  const recognitionRef = useRef<any>(null);
+  const speakRef = useRef<any>(null);
+
+  useEffect(() => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    setSpeechSupported(!!SpeechRecognition);
+
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      // Trigger voice loading and register handler
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
+
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
+
+  const cleanMarkdownForSpeech = (text: string): string => {
+    if (!text) return '';
+    
+    // 1. Process line-by-line first to handle block elements (lists, headers) cleanly
+    const lines = text.split('\n');
+    const processedLines = lines.map((line) => {
+      const trimmed = line.trim();
+      
+      // Check for bullet list (*, -, •, +)
+      if (/^[•\-*+]\s+/.test(trimmed)) {
+        let content = trimmed.replace(/^[•\-*+]\s+/, '');
+        if (content && !/[.!?]$/.test(content)) {
+          content += '.';
+        }
+        return content;
+      }
+      
+      // Check for numbered list (e.g. 1. Item)
+      const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+      if (numMatch) {
+        let content = numMatch[2];
+        if (content && !/[.!?]$/.test(content)) {
+          content += '.';
+        }
+        return `Number ${numMatch[1]}, ${content}`;
+      }
+
+      // Check for headings (# headings)
+      if (/^#+\s+/.test(trimmed)) {
+        let content = trimmed.replace(/^#+\s+/, '');
+        if (content && !/[.!?]$/.test(content)) {
+          content += '.';
+        }
+        return content;
+      }
+      
+      return line;
+    });
+
+    let cleaned = processedLines.join(' ');
+
+    // 2. Remove markdown links: [link text](url) -> link text
+    cleaned = cleaned.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+    // 3. Remove bold emphasis: **bold** or __bold__ -> bold
+    cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1');
+    cleaned = cleaned.replace(/__([^_]+)__/g, '$1');
+
+    // 4. Remove italic emphasis: *italic* or _italic_ -> italic
+    cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');
+    cleaned = cleaned.replace(/_([^_]+)_/g, '$1');
+
+    // 5. Remove inline backticks
+    cleaned = cleaned.replace(/`([^`]+)`/g, '$1');
+
+    // 6. Clean up extra spaces and extra/consecutive periods
+    cleaned = cleaned
+      .replace(/\s+/g, ' ')
+      .replace(/\.+/g, '.')
+      .trim();
+
+    return cleaned;
+  };
+
+  const selectBestVoice = (): SpeechSynthesisVoice | null => {
+    if (!window.speechSynthesis) return null;
+    const voices = window.speechSynthesis.getVoices();
+    console.log("Available Voices:", voices);
+
+    const priorityList = [
+      'google uk english female',
+      'google us english',
+      'microsoft zira',
+      'samantha',
+      'karen',
+      'veena'
+    ];
+
+    let selectedVoice: SpeechSynthesisVoice | null = null;
+
+    for (const prefix of priorityList) {
+      const found = voices.find(v => v.name.toLowerCase().includes(prefix));
+      if (found) {
+        selectedVoice = found;
+        break;
+      }
+    }
+
+    if (!selectedVoice) {
+      const englishFallback = voices.find(v => v.lang.toLowerCase().startsWith('en'));
+      if (englishFallback) {
+        selectedVoice = englishFallback;
+      }
+    }
+
+    if (!selectedVoice) {
+      selectedVoice = voices.find(v => v.default) || voices[0] || null;
+    }
+
+    console.log("Selected Voice:", selectedVoice?.name);
+    return selectedVoice;
+  };
+
+  const speak = (text: string, force = false) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+
+    if (!voiceResponses && !force) return;
+
+    try {
+      const cleaned = cleanMarkdownForSpeech(text);
+      if (!cleaned) return;
+
+      const utterance = new SpeechSynthesisUtterance(cleaned);
+      speakRef.current = utterance;
+
+      const selectedVoice = selectBestVoice();
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        utterance.lang = selectedVoice.lang;
+      } else {
+        utterance.lang = 'en-US';
+      }
+
+      utterance.rate = 0.95;
+      utterance.pitch = 1.25;
+      utterance.volume = 1;
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.error('Speech synthesis failed:', err);
+      setIsSpeaking(false);
+    }
+  };
+
+  const stopSpeaking = () => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+  };
+
+  const replayLastResponse = () => {
+    const assistantMessages = messages.filter((m) => m.role === 'assistant');
+    if (assistantMessages.length > 0) {
+      const lastMsg = assistantMessages[assistantMessages.length - 1];
+      speak(lastMsg.content, true);
+    }
+  };
+
+  const startSpeechRecognition = () => {
+    if (!speechSupported) {
+      setSpeechError('Speech recognition is not supported in this browser.');
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+
+    try {
+      const rec = new SpeechRecognition();
+      recognitionRef.current = rec;
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = 'en-US';
+
+      rec.onstart = () => {
+        setIsListening(true);
+        setSpeechError(null);
+      };
+
+      rec.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (autoSend) {
+          sendMessage(transcript);
+        } else {
+          setInput((prev) => (prev ? prev + ' ' + transcript : transcript));
+        }
+      };
+
+      rec.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          setSpeechError('Microphone permission denied.');
+        } else {
+          setSpeechError(`Speech recognition error: ${event.error}`);
+        }
+        setIsListening(false);
+      };
+
+      rec.onend = () => {
+        setIsListening(false);
+      };
+
+      rec.start();
+    } catch (err) {
+      console.error('Speech recognition failed to start:', err);
+      setSpeechError('Failed to start speech recognition.');
+      setIsListening(false);
+    }
+  };
   
   const chatSectionRef = useRef<HTMLDivElement>(null);
   const faqSectionRef = useRef<HTMLDivElement>(null);
@@ -102,6 +354,17 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
 
   const sendMessage = async (text: string) => {
     if (!text.trim()) return;
+
+    // Stop speaking when user sends a new message
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+    // Also stop listening if active
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -135,6 +398,7 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
       };
 
       setMessages((prev) => [...prev, aiMsg]);
+      speak(aiMsg.content);
     } catch (err) {
       console.error(err);
       const aiMsg: Message = {
@@ -143,6 +407,7 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
         content: 'Sorry, I could not connect to the knowledge base.',
       };
       setMessages((prev) => [...prev, aiMsg]);
+      speak(aiMsg.content);
     } finally {
       setIsTyping(false);
     }
@@ -293,6 +558,88 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
                 </p>
               </div>
             </div>
+
+            {/* Voice Controls and Settings Dropdown */}
+            <div className="flex items-center gap-2 relative">
+              {/* Voice Responses Auto-Play Indicator/Mute Toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  const val = !voiceResponses;
+                  setVoiceResponses(val);
+                  if (!val) stopSpeaking();
+                }}
+                title={voiceResponses ? "Mute Voice Responses" : "Unmute Voice Responses"}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors text-white ${
+                  voiceResponses ? 'bg-white/15 hover:bg-white/25' : 'bg-red-500/30 text-red-200 hover:bg-red-500/40'
+                }`}
+              >
+                {voiceResponses ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </button>
+
+              {/* Stop Speaking (Visible when active speech output is running) */}
+              {isSpeaking && (
+                <button
+                  type="button"
+                  onClick={stopSpeaking}
+                  title="Stop Speaking"
+                  className="w-8 h-8 rounded-lg bg-red-500/80 hover:bg-red-500 text-white flex items-center justify-center transition-colors animate-pulse"
+                >
+                  <Square className="w-4 h-4" fill="white" />
+                </button>
+              )}
+
+              {/* Replay Last Response (Reads the last assistant reply) */}
+              <button
+                type="button"
+                onClick={replayLastResponse}
+                title="Replay Last AI Response"
+                className="w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+
+              {/* Voice Settings Dropdown Toggle */}
+              <button
+                type="button"
+                onClick={() => setShowVoiceSettings(!showVoiceSettings)}
+                title="Voice Settings"
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors text-white ${
+                  showVoiceSettings ? 'bg-white/30' : 'bg-white/15 hover:bg-white/25'
+                }`}
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+
+              {/* Voice Settings Dropdown */}
+              {showVoiceSettings && (
+                <div className="absolute right-0 top-10 w-56 bg-white rounded-xl shadow-lg border border-slate-100 py-3 z-50 animate-fade-in text-slate-800">
+                  <p className="px-4 pb-2 mb-2 border-b border-slate-100 font-bold text-xs text-slate-500">Voice Settings</p>
+                  
+                  {/* Voice Responses (ON/OFF) */}
+                  <label className="flex items-center justify-between px-4 py-2 hover:bg-slate-50 cursor-pointer text-xs font-medium">
+                    <span>Voice Responses</span>
+                    <input
+                      type="checkbox"
+                      checked={voiceResponses}
+                      onChange={(e) => setVoiceResponses(e.target.checked)}
+                      className="rounded border-slate-300 text-[#003B7A] focus:ring-[#003B7A] w-4 h-4"
+                    />
+                  </label>
+
+                  {/* Auto Send After Speech (ON/OFF) */}
+                  <label className="flex items-center justify-between px-4 py-2 hover:bg-slate-50 cursor-pointer text-xs font-medium">
+                    <span>Auto-send after speech</span>
+                    <input
+                      type="checkbox"
+                      checked={autoSend}
+                      onChange={(e) => setAutoSend(e.target.checked)}
+                      className="rounded border-slate-300 text-[#003B7A] focus:ring-[#003B7A] w-4 h-4"
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Messages Box */}
@@ -353,15 +700,42 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
 
           {/* Form Input */}
           <div className="px-5 py-4 border-t border-slate-100 bg-white">
+            {speechError && (
+              <div className="mb-2.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs flex justify-between items-center transition-all animate-fade-in">
+                <span>{speechError}</span>
+                <button type="button" onClick={() => setSpeechError(null)} className="font-bold hover:text-red-800 text-sm">×</button>
+              </div>
+            )}
             <form onSubmit={(e) => { e.preventDefault(); sendMessage(input); }} className="flex gap-3 items-end">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-                placeholder="Type your question about admissions, fees, or courses..."
+                placeholder={isListening ? "Listening... Speak now..." : "Type your question about admissions, fees, or courses..."}
                 rows={1}
                 className="flex-1 px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#003B7A] focus:bg-white resize-none transition-all"
               />
+
+              {/* MICROPHONE BUTTON */}
+              <button
+                type="button"
+                onClick={startSpeechRecognition}
+                title={isListening ? "Stop listening" : "Ask using your voice"}
+                className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all flex-shrink-0 relative ${
+                  isListening
+                    ? 'bg-red-500 text-white animate-pulse shadow-md ring-2 ring-red-400'
+                    : speechSupported
+                      ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      : 'bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed'
+                }`}
+              >
+                {speechSupported ? (
+                  isListening ? <Mic className="w-5 h-5 text-white" /> : <Mic className="w-5 h-5" />
+                ) : (
+                  <MicOff className="w-5 h-5" />
+                )}
+              </button>
+
               <button
                 type="submit"
                 disabled={!input.trim() || isTyping}
