@@ -114,6 +114,7 @@ export function ChatPage() {
         {
           question: text.trim(),
           conversationId: isRealDbId ? activeSessionId : undefined,
+          history: activeSession.messages.map((m) => ({ role: m.role, content: m.content })),
         }
       );
       const answer = res.data?.data?.answer ?? "I could not find that information in the uploaded university documents. Please contact the admissions office for confirmation.";

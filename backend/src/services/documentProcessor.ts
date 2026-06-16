@@ -3,6 +3,8 @@ import path from 'path';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
 import { prisma } from '../config/database';
+import { getEmbedding } from './embedding';
+
 
 const CHUNK_SIZE = 300;
 const CHUNK_OVERLAP = 50;
@@ -117,6 +119,52 @@ export async function processDocument(documentId: string): Promise<void> {
         chunkIndex: index,
       })),
     });
+
+    // Fetch the newly created chunks to retrieve their database IDs
+    const dbChunks = await prisma.documentChunk.findMany({
+      where: { documentId },
+      orderBy: { chunkIndex: 'asc' },
+    });
+
+    // Generate embeddings and store them in the database in small batches to respect rate limits
+    const BATCH_SIZE = 5;
+    const DELAY_BETWEEN_BATCHES_MS = 500;
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    // Retry helper for API call resilience
+    const getEmbeddingWithRetry = async (text: string, retries = 3, delayMs = 1000): Promise<number[]> => {
+      for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+          return await getEmbedding(text);
+        } catch (err) {
+          if (attempt === retries) throw err;
+          console.warn(`[Embedding Ingestion Retry] Attempt ${attempt} failed: ${err instanceof Error ? err.message : String(err)}. Retrying in ${delayMs}ms...`);
+          await delay(delayMs);
+          delayMs *= 2; // Exponential backoff
+        }
+      }
+      throw new Error('Unreachable');
+    };
+
+    for (let i = 0; i < dbChunks.length; i += BATCH_SIZE) {
+      const batch = dbChunks.slice(i, i + BATCH_SIZE);
+      
+      await Promise.all(
+        batch.map(async (chunk) => {
+          const embedding = await getEmbeddingWithRetry(chunk.content);
+          const vectorString = `[${embedding.join(',')}]`;
+          await prisma.$executeRawUnsafe(
+            `UPDATE document_chunks SET embedding = $1::vector WHERE id = $2`,
+            vectorString,
+            chunk.id
+          );
+        })
+      );
+
+      if (i + BATCH_SIZE < dbChunks.length) {
+        await delay(DELAY_BETWEEN_BATCHES_MS);
+      }
+    }
 
     await prisma.document.update({
       where: { id: documentId },

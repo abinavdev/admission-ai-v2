@@ -1,8 +1,8 @@
 import { prisma } from '../config/database';
 import { getEmbedding } from '../services/embedding';
 
-const BATCH_SIZE = 5; // Process 5 chunks at a time to prevent rate limits
-const DELAY_BETWEEN_BATCHES_MS = 500; // Delay of 500ms between batches
+const BATCH_SIZE = 2; // Process 2 chunks at a time to prevent rate limits
+const DELAY_BETWEEN_BATCHES_MS = 1500; // Delay of 1500ms between batches to stay under 100 RPM
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

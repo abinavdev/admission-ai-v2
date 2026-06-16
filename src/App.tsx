@@ -37,7 +37,7 @@ function AppRoutes() {
     const user = localStorage.getItem('auth_user');
     const hasToken = !!(token && user);
 
-    if (savedPage && savedPage !== 'login' && savedPage !== 'landing') {
+    if (savedPage && savedPage !== 'login') {
       if (dashboardPages.includes(savedPage)) {
         if (hasToken) return savedPage;
       } else {
@@ -52,7 +52,7 @@ function AppRoutes() {
   const navigate = (page: Page) => setCurrentPage(page);
 
   useEffect(() => {
-    if (currentPage && currentPage !== 'login' && currentPage !== 'landing') {
+    if (currentPage && currentPage !== 'login') {
       localStorage.setItem('current_page', currentPage);
     }
   }, [currentPage]);

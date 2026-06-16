@@ -28,8 +28,136 @@ const SYNONYMS: Record<string, string[]> = {
   admission: ['application', 'registration', 'enrollment'],
   placements: ['jobs', 'career', 'recruitment'],
   placement: ['jobs', 'career', 'recruitment'],
-  coursewise: ['programs', 'btech', 'mtech']
+  coursewise: ['programs', 'btech', 'mtech'],
+  // Synonym expansion for course abbreviations to map to full text content
+  cse: ['computer', 'science', 'engineering'],
+  it: ['information', 'technology'],
+  ece: ['electronics', 'communication'],
+  eee: ['electrical', 'electronics'],
+  mca: ['computer', 'applications'],
+  mba: ['business', 'administration']
 };
+
+export const COURSE_DOCUMENT_MAP: Record<string, { docName: string; keywords: string[] }> = {
+  cse: {
+    docName: 'btech_cse_cusat.txt',
+    keywords: ['cse', 'computer science']
+  },
+  it: {
+    docName: 'btech_it_cusat.txt',
+    keywords: ['it', 'information technology']
+  },
+  ece: {
+    docName: 'btech_ece_cusat.txt',
+    keywords: ['ece', 'electronics and communication', 'electronics & communication']
+  },
+  eee: {
+    docName: 'btech_eee_cusat.txt',
+    keywords: ['eee', 'electrical and electronics', 'electrical & electronics']
+  },
+  civil: {
+    docName: 'btech_civil_cusat.txt',
+    keywords: ['civil']
+  },
+  mechanical: {
+    docName: 'btech_mechanical_cusat.txt',
+    keywords: ['mechanical', 'mech']
+  },
+  marine: {
+    docName: 'btech_marine_engineering_cusat.txt',
+    keywords: ['marine']
+  },
+  safety: {
+    docName: 'btech_safety_fire_cusat.txt',
+    keywords: ['safety', 'fire', 'safety & fire']
+  },
+  ai: {
+    docName: 'btech_ai_ds_cusat.txt',
+    keywords: ['ai', 'artificial intelligence', 'data science', 'ds']
+  },
+  chemistry: {
+    docName: 'msc_chemistry_cusat.txt',
+    keywords: ['chemistry']
+  },
+  biology: {
+    docName: 'msc_marine_biology_cusat.txt',
+    keywords: ['marine biology', 'biology']
+  },
+  mathematics: {
+    docName: 'msc_mathematics_cusat.txt',
+    keywords: ['mathematics', 'maths', 'math']
+  },
+  biotechnology: {
+    docName: 'msc_biotechnology_cusat.txt',
+    keywords: ['biotechnology', 'biotech']
+  },
+  llb: {
+    docName: 'bsc_llb_computer_science_cusat.txt',
+    keywords: ['bsc llb', 'computer science llb']
+  },
+  bba_llb: {
+    docName: 'bba_llb_cusat.txt',
+    keywords: ['bba llb', 'bba law']
+  },
+  bcom_llb: {
+    docName: 'bcom_llb_cusat.txt',
+    keywords: ['bcom llb', 'bcom law']
+  },
+  mca: {
+    docName: 'courses_overview.txt',
+    keywords: ['mca', 'computer applications']
+  },
+  mba: {
+    docName: 'courses_overview.txt',
+    keywords: ['mba', 'business administration']
+  },
+  naval: {
+    docName: 'btech_naval_architecture_cusat.txt',
+    keywords: ['naval', 'naval architecture', 'ship building']
+  }
+};
+
+export function detectCourseDocument(question: string): string | null {
+  const lowercaseQuestion = question.toLowerCase();
+  
+  for (const entry of Object.values(COURSE_DOCUMENT_MAP)) {
+    for (const kw of entry.keywords) {
+      if (kw.length <= 3) {
+        const regex = new RegExp(`\\b${kw}\\b`, 'i');
+        if (regex.test(lowercaseQuestion)) {
+          return entry.docName;
+        }
+      } else {
+        if (lowercaseQuestion.includes(kw)) {
+          return entry.docName;
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
+export function isCourseSpecificDocument(docName: string): boolean {
+  const name = docName.toLowerCase();
+  
+  // 1. Prefix-based check for general scaling and new course files
+  if (name.startsWith('btech_') || 
+      name.startsWith('msc_') || 
+      name.startsWith('bsc_') || 
+      name.startsWith('bba_') || 
+      name.startsWith('bcom_')) {
+    return true;
+  }
+  
+  // 2. Map-based check for any other mapped document (excluding courses_overview.txt)
+  for (const entry of Object.values(COURSE_DOCUMENT_MAP)) {
+    if (entry.docName === docName && docName !== 'courses_overview.txt') {
+      return true;
+    }
+  }
+  return false;
+}
 
 export interface RetrievedChunk {
   content: string;
@@ -291,10 +419,29 @@ export async function retrieveRelevantChunks(
   const selectedChunks: RetrievedChunk[] = [];
   const limit = Math.max(3, topK);
 
+  // 1. Adaptive Course Routing: Detect specific course tags dynamically using COURSE_DOCUMENT_MAP
+  const primaryDocName = detectCourseDocument(question) || '';
+
+  // 2. Prioritize up to 4 chunks from the primary matching document if confidently detected
+  if (primaryDocName) {
+    const primaryDoc = docSummaries.find(d => d.docName === primaryDocName);
+    if (primaryDoc) {
+      const primaryChunksToTake = primaryDoc.chunks.slice(0, 4);
+      selectedChunks.push(...primaryChunksToTake);
+      // Remove these chunks from docSummaries list so they aren't round-robined/duplicated
+      primaryDoc.chunks = primaryDoc.chunks.slice(4);
+    }
+  }
+
+  // 3. Fall back to standard round-robin for the remaining slots (supporting files: fees, hostel, etc.)
   for (let chunkIndex = 0; chunkIndex < maxChunksPerDoc; chunkIndex++) {
     for (const doc of docSummaries) {
       if (selectedChunks.length >= limit) {
         break;
+      }
+      // If a specific course document was confidently detected, skip chunks from other course-specific documents
+      if (primaryDocName && doc.docName !== primaryDocName && isCourseSpecificDocument(doc.docName)) {
+        continue;
       }
       if (chunkIndex < doc.chunks.length) {
         selectedChunks.push(doc.chunks[chunkIndex]);
