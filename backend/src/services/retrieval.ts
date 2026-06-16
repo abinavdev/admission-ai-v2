@@ -117,6 +117,33 @@ export const COURSE_DOCUMENT_MAP: Record<string, { docName: string; keywords: st
   }
 };
 
+export function detectCatalogIntent(question: string): boolean {
+  const lowercaseQuestion = question.toLowerCase().trim();
+  const patterns = [
+    /what\s+courses\s+are\s+available/i,
+    /list\s+all\s+courses/i,
+    /available\s+programs/i,
+    /courses\s+offered/i,
+    /what\s+can\s+i\s+study/i,
+    /programs\s+available/i,
+    /available\s+courses/i,
+    /course\s+list/i,
+    /list\s+of\s+courses/i,
+    /what\s+all\s+courses/i,
+    /which\s+courses/i,
+    /show\s+all\s+programs/i,
+    /show\s+all\s+courses/i,
+    /list\s+all\s+programs/i,
+    /list\s+courses/i,
+    /list\s+programs/i,
+    /all\s+courses/i,
+    /all\s+programs/i,
+    /programs\s+offered/i
+  ];
+  return patterns.some(pattern => pattern.test(lowercaseQuestion));
+}
+
+
 export function detectCourseDocument(question: string): string | null {
   const lowercaseQuestion = question.toLowerCase();
   
@@ -250,12 +277,52 @@ function tfScore(
 
   return score;
 }
-
 export async function retrieveRelevantChunks(
   question: string,
-  topK = 5
+  topK = 5,
+  originalQuestion?: string
 ): Promise<RetrievedChunk[]> {
   const start = Date.now();
+  const isCatalogQuery = detectCatalogIntent(question) || (originalQuestion ? detectCatalogIntent(originalQuestion) : false);
+
+  if (isCatalogQuery) {
+    console.log(`[Catalog Path Activated] Question: "${question}" (original: "${originalQuestion || ''}")`);
+    const overviewChunks = await prisma.documentChunk.findMany({
+      where: {
+        document: {
+          name: 'courses_overview.txt',
+          status: 'PROCESSED'
+        }
+      },
+      include: {
+        document: {
+          select: {
+            name: true,
+            status: true
+          }
+        }
+      },
+      orderBy: {
+        chunkIndex: 'asc'
+      }
+    });
+
+    const results = overviewChunks.map(chunk => ({
+      content: chunk.content,
+      documentName: chunk.document.name,
+      score: 1.0,
+      chunkIndex: chunk.chunkIndex,
+      documentId: chunk.documentId,
+      semanticScore: 1.0,
+      keywordScore: 1.0,
+      hybridScore: 1.0
+    }));
+
+    console.log(`[Catalog Path Activated] Returning all ${results.length} chunks from courses_overview.txt in order.`);
+    console.log('retrieval_time_ms=', Date.now() - start);
+    return results;
+  }
+
 
   // 1. Keyword search (TF scoring)
   const queryTerms = tokenize(question);
@@ -295,6 +362,11 @@ export async function retrieveRelevantChunks(
 
     const content = chunk.content.toLowerCase();
     const fileName = chunk.document.name.toLowerCase();
+
+    // If it is a catalog query, force all courses_overview.txt chunks to have a high keyword score
+    if (isCatalogQuery && chunk.document.name === 'courses_overview.txt') {
+      score += 15.0;
+    }
 
     expanded.forEach((term) => {
       if (fileName.includes(term)) score += 6;
@@ -352,6 +424,18 @@ export async function retrieveRelevantChunks(
     const documentId = keywordInfo?.documentId || semanticInfo?.documentId || '';
     const chunkIndex = keywordInfo?.chunkIndex !== undefined ? keywordInfo.chunkIndex : (semanticInfo?.chunkIndex || 0);
 
+    // Resolve documentName if it was only in semantic search and not in keywordMap
+    let resolvedDocumentName = documentName;
+    if (!resolvedDocumentName) {
+      const match = dbChunks.find((c) => c.id === id);
+      resolvedDocumentName = match?.document.name || 'Unknown Document';
+    }
+
+    // Skip other course branch files entirely for catalog queries to avoid pollution
+    if (isCatalogQuery && isCourseSpecificDocument(resolvedDocumentName) && resolvedDocumentName !== 'courses_overview.txt') {
+      return;
+    }
+
     const keywordScore = keywordInfo?.keywordScore || 0;
     const semanticScore = semanticInfo?.similarity || 0;
 
@@ -359,13 +443,11 @@ export async function retrieveRelevantChunks(
     const normalizedKeywordScore = maxKeywordScore > 0 ? keywordScore / maxKeywordScore : 0;
 
     // Calculate hybrid score: 0.7 * semantic + 0.3 * keyword
-    const hybridScore = 0.7 * semanticScore + 0.3 * normalizedKeywordScore;
+    let hybridScore = 0.7 * semanticScore + 0.3 * normalizedKeywordScore;
 
-    // Resolve documentName if it was only in semantic search and not in keywordMap
-    let resolvedDocumentName = documentName;
-    if (!resolvedDocumentName) {
-      const match = dbChunks.find((c) => c.id === id);
-      resolvedDocumentName = match?.document.name || 'Unknown Document';
+    // Direct score boost to guarantee courses_overview.txt chunks pass threshold filter and rank high
+    if (isCatalogQuery && resolvedDocumentName === 'courses_overview.txt') {
+      hybridScore = Math.max(hybridScore, 0.85);
     }
 
     hybridResults.push({
@@ -419,36 +501,68 @@ export async function retrieveRelevantChunks(
   const selectedChunks: RetrievedChunk[] = [];
   const limit = Math.max(3, topK);
 
-  // 1. Adaptive Course Routing: Detect specific course tags dynamically using COURSE_DOCUMENT_MAP
-  const primaryDocName = detectCourseDocument(question) || '';
+  if (isCatalogQuery) {
+    const overviewChunks = filteredResults.filter(c => c.documentName === 'courses_overview.txt');
+    
+    // Select representative chunks dynamically to cover all program categories
+    const ugChunk = overviewChunks.find(c => c.content.includes('UNDERGRADUATE PROGRAMS')) || overviewChunks[0];
+    const pgChunk = overviewChunks.find(c => c.content.includes('POSTGRADUATE PROGRAMS')) || overviewChunks.find(c => c.content.includes('M.Tech')) || overviewChunks[0];
+    const integratedChunk = overviewChunks.find(c => c.content.includes('Integrated MCA')) || overviewChunks.find(c => c.content.includes('Integrated M.Sc')) || overviewChunks[0];
+    const lawChunk = overviewChunks.find(c => c.content.includes('LLB')) || overviewChunks.find(c => c.content.includes('Law Program')) || overviewChunks[0];
 
-  // 2. Prioritize up to 4 chunks from the primary matching document if confidently detected
-  if (primaryDocName) {
-    const primaryDoc = docSummaries.find(d => d.docName === primaryDocName);
-    if (primaryDoc) {
-      const primaryChunksToTake = primaryDoc.chunks.slice(0, 4);
-      selectedChunks.push(...primaryChunksToTake);
-      // Remove these chunks from docSummaries list so they aren't round-robined/duplicated
-      primaryDoc.chunks = primaryDoc.chunks.slice(4);
+    const seen = new Set<number>();
+    const catalogChunks: RetrievedChunk[] = [];
+
+    [ugChunk, pgChunk, integratedChunk, lawChunk].forEach(c => {
+      if (c && !seen.has(c.chunkIndex)) {
+        seen.add(c.chunkIndex);
+        catalogChunks.push(c);
+      }
+    });
+
+    // Fill up to limit with remaining overview chunks sorted by hybridScore descending
+    const sortedOverview = overviewChunks.sort((a, b) => b.hybridScore - a.hybridScore);
+    for (const c of sortedOverview) {
+      if (catalogChunks.length >= limit) break;
+      if (!seen.has(c.chunkIndex)) {
+        seen.add(c.chunkIndex);
+        catalogChunks.push(c);
+      }
     }
-  }
+    
+    selectedChunks.push(...catalogChunks);
+  } else {
+    // 1. Adaptive Course Routing: Detect specific course tags dynamically using COURSE_DOCUMENT_MAP
+    const primaryDocName = detectCourseDocument(question) || '';
 
-  // 3. Fall back to standard round-robin for the remaining slots (supporting files: fees, hostel, etc.)
-  for (let chunkIndex = 0; chunkIndex < maxChunksPerDoc; chunkIndex++) {
-    for (const doc of docSummaries) {
+    // 2. Prioritize up to 4 chunks from the primary matching document if confidently detected
+    if (primaryDocName) {
+      const primaryDoc = docSummaries.find(d => d.docName === primaryDocName);
+      if (primaryDoc) {
+        const primaryChunksToTake = primaryDoc.chunks.slice(0, 4);
+        selectedChunks.push(...primaryChunksToTake);
+        // Remove these chunks from docSummaries list so they aren't round-robined/duplicated
+        primaryDoc.chunks = primaryDoc.chunks.slice(4);
+      }
+    }
+
+    // 3. Fall back to standard round-robin for the remaining slots (supporting files: fees, hostel, etc.)
+    for (let chunkIndex = 0; chunkIndex < maxChunksPerDoc; chunkIndex++) {
+      for (const doc of docSummaries) {
+        if (selectedChunks.length >= limit) {
+          break;
+        }
+        // If a specific course document was confidently detected, skip chunks from other course-specific documents
+        if (primaryDocName && doc.docName !== primaryDocName && isCourseSpecificDocument(doc.docName)) {
+          continue;
+        }
+        if (chunkIndex < doc.chunks.length) {
+          selectedChunks.push(doc.chunks[chunkIndex]);
+        }
+      }
       if (selectedChunks.length >= limit) {
         break;
       }
-      // If a specific course document was confidently detected, skip chunks from other course-specific documents
-      if (primaryDocName && doc.docName !== primaryDocName && isCourseSpecificDocument(doc.docName)) {
-        continue;
-      }
-      if (chunkIndex < doc.chunks.length) {
-        selectedChunks.push(doc.chunks[chunkIndex]);
-      }
-    }
-    if (selectedChunks.length >= limit) {
-      break;
     }
   }
 

@@ -2,7 +2,7 @@ import { Response, Request } from 'express';
 import { prisma } from '../config/database';
 import { success, error, paginated } from '../utils/response';
 import { AuthRequest } from '../middleware/auth';
-import { retrieveRelevantChunks, buildAnswer, buildContext } from '../services/retrieval';
+import { retrieveRelevantChunks, buildAnswer, buildContext, detectCatalogIntent } from '../services/retrieval';
 import { generateAnswerWithGemini, generateSearchQuery } from '../services/llm';
 import { generateAnswerWithGroq } from '../services/groq';
 
@@ -64,7 +64,7 @@ export async function askQuestion(req: Request, res: Response): Promise<void> {
     console.log('Rewritten Standalone Query:', standaloneQuery);
 
     // Retrieve chunks using the rewritten query
-    const chunks = await retrieveRelevantChunks(standaloneQuery, 8);
+    const chunks = await retrieveRelevantChunks(standaloneQuery, 8, q);
 
     // Save the user's incoming message ONLY if conversation is persisted
     if (isPersisted && dbConversation) {
@@ -78,7 +78,9 @@ export async function askQuestion(req: Request, res: Response): Promise<void> {
     }
 
     // Build merged, deduped context
-    const context = buildContext(chunks, 3000);
+    const isCatalog = detectCatalogIntent(standaloneQuery) || detectCatalogIntent(q);
+    const contextLimit = isCatalog ? 8000 : 3000;
+    const context = buildContext(chunks, contextLimit);
 
     console.log('Top chunks returned:', chunks.length);
     chunks.forEach((c, i) => {

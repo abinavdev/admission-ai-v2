@@ -79,6 +79,90 @@ function FormattedMessage({ content }: { content: string }) {
   );
 }
 
+const TRANSCRIPT_CORRECTION_MAP: Record<string, string> = {
+  // CUSAT
+  'pusad': 'CUSAT',
+  'kusat': 'CUSAT',
+  'koosat': 'CUSAT',
+  'qsat': 'CUSAT',
+  'who sat': 'CUSAT',
+  'you sat': 'CUSAT',
+  'do sat': 'CUSAT',
+  'to sat': 'CUSAT',
+  'cusack': 'CUSAT',
+  'use of': 'CUSAT',
+  
+  // SOE
+  'soy': 'SOE',
+  'so e': 'SOE',
+  'so-e': 'SOE',
+  's o e': 'SOE',
+  'sew': 'SOE',
+  'soee': 'SOE',
+
+  // B.Tech / BTech
+  'btech': 'B.Tech',
+  'b tech': 'B.Tech',
+  'b-tech': 'B.Tech',
+  'be tech': 'B.Tech',
+  'v tech': 'B.Tech',
+
+  // CSE
+  'c s e': 'CSE',
+  'csa': 'CSE',
+  'csc': 'CSE',
+
+  // IT
+  'i t': 'IT',
+  'i.t.': 'IT',
+
+  // ECE
+  'e c e': 'ECE',
+  'eca': 'ECE',
+  'ecc': 'ECE',
+
+  // EEE
+  'e e e': 'EEE',
+
+  // MCA
+  'm c a': 'MCA',
+  'amca': 'MCA',
+
+  // MBA
+  'm b a': 'MBA',
+
+  // Hostel
+  'hostile': 'Hostel',
+  'hostell': 'Hostel',
+
+  // Placements
+  'placments': 'Placements',
+  'playsments': 'Placements',
+  'placement': 'Placements',
+
+  // Scholarship
+  'scholership': 'Scholarship',
+  'scholarships': 'Scholarship'
+};
+
+const correctTranscript = (text: string): string => {
+  if (!text) return '';
+  console.log("Original Transcript:", text);
+  
+  let corrected = text;
+  const sortedKeys = Object.keys(TRANSCRIPT_CORRECTION_MAP).sort((a, b) => b.length - a.length);
+  
+  for (const key of sortedKeys) {
+    const value = TRANSCRIPT_CORRECTION_MAP[key];
+    const escapedKey = key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(`\\b${escapedKey}\\b`, 'gi');
+    corrected = corrected.replace(regex, value);
+  }
+  
+  console.log("Corrected Transcript:", corrected);
+  return corrected;
+};
+
 export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
   const { isAuthenticated } = useAuthContext();
   const [messages, setMessages] = useState<Message[]>([
@@ -465,7 +549,7 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
       recognitionRef.current = rec;
       rec.continuous = false;
       rec.interimResults = false;
-      rec.lang = 'en-US';
+      rec.lang = 'en-IN';
 
       rec.onstart = () => {
         setIsListening(true);
@@ -478,7 +562,8 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
         const transcript = event.results[0][0].transcript;
         setSilenceSeconds(0);
         if (transcript.trim()) {
-          sendContinuousMessage(transcript);
+          const corrected = correctTranscript(transcript);
+          sendContinuousMessage(corrected);
         }
       };
 
@@ -606,7 +691,7 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
       recognitionRef.current = rec;
       rec.continuous = false;
       rec.interimResults = false;
-      rec.lang = 'en-US';
+      rec.lang = 'en-IN';
 
       rec.onstart = () => {
         setIsListening(true);
@@ -615,10 +700,11 @@ export function StudentPortalPage({ onNavigate }: StudentPortalProps) {
 
       rec.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
+        const corrected = correctTranscript(transcript);
         if (autoSend) {
-          sendMessage(transcript);
+          sendMessage(corrected);
         } else {
-          setInput((prev) => (prev ? prev + ' ' + transcript : transcript));
+          setInput((prev) => (prev ? prev + ' ' + corrected : corrected));
         }
       };
 
