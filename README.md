@@ -308,17 +308,23 @@ admission-ai-v2/
 
 ### Student Portal
 
+<<<<<<< HEAD
 ![Student Portal 3](screenshorts/Student%20Portal3.png)
 ![Student Portal 1](screenshorts/Student%20Portal1.png)
 ![Student Portal 2](screenshorts/Student%20Portal2.png)
 
+=======
+![Student Portal 1](screenshots/Student%20Portal1.png)
+![Student Portal 2](screenshots/Student%20Portal2.png)
+![Student Portal 3](screenshots/Student%20Portal3.png)
+>>>>>>> ab72b12 (Added SS to Readme)
 
 ### Admin Dashboard
 
-![Admin Dashboard 1](screenshorts/Admin%20Dashboard1.png)
-![Admin Dashboard 2](screenshorts/Admin%20Dashboard2.png)
-![Admin Dashboard 3](screenshorts/Admin%20Dashboard3.png)
-![Admin Dashboard 4](screenshorts/Admin%20Dashboard4.png)
+![Admin Dashboard 1](screenshots/Admin%20Dashboard1.png)
+![Admin Dashboard 2](screenshots/Admin%20Dashboard2.png)
+![Admin Dashboard 3](screenshots/Admin%20Dashboard3.png)
+![Admin Dashboard 4](screenshots/Admin%20Dashboard4.png)
 
 
 ---
