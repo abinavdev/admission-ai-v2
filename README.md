@@ -1,54 +1,235 @@
-# AdmissionAI – AI-Powered University Admission Counselor
+# AdmissionAI – AI-Powered University Admission & Student Engagement Platform
 
-AdmissionAI is a portfolio-ready, full-stack Retrieval-Augmented Generation (RAG) platform designed to automate and streamline student admission enquiries. The system acts as a virtual counselor, providing instant, highly accurate, and voice-enabled responses regarding courses, fees, eligibility criteria, hostel facilities, scholarships, and general campus life based on verified university knowledge documents.
+AdmissionAI is a full-stack AI-powered admission assistance platform that helps universities automate student enquiries through intelligent chat, voice conversations, retrieval-augmented generation (RAG), and lead management.
+
+The platform acts as a virtual admission counselor capable of answering questions about courses, eligibility, fees, scholarships, hostels, placements, and campus life using information retrieved from a university knowledge base.
 
 ---
 
 ## Overview
 
-AdmissionAI helps universities digitize and scale their student helpdesk operations. By combining modern AI models, advanced document retrieval strategies, and hands-free voice interactions, the platform automates repetitive administrative workflows while capturing qualified leads for human advisors.
+Universities receive thousands of repetitive admission-related enquiries every year. AdmissionAI reduces the workload of admission offices by providing instant, context-aware, and voice-enabled assistance to prospective students.
 
-Key capabilities of the platform include:
-*   💬 **AI Chat Assistant:** Context-aware conversations with memory and query rewriting.
-*   🎙️ **Voice Admission Counselor:** Hands-free, continuous conversational loop with natural speech synthesis.
-*   📚 **Knowledge Base Management:** End-to-end PDF/text document ingestion, chunking, and indexing.
-*   🔍 **Advanced Retrieval System:** Hybrid keyword/semantic vector search with specialized routing.
-*   💼 **Lead Capture & Management:** Automatic registration and tracking of student prospective enquiries.
-*   📊 **Analytics Dashboard:** Visualization of student engagement metrics, query volume, and hot topics.
-*   📋 **Conversation History:** Detailed logs of student queries and AI-assisted responses.
+The platform combines:
+
+* AI Chat Assistant
+* Voice Admission Counselor
+* Retrieval-Augmented Generation (RAG)
+* Knowledge Base Management
+* Lead Capture & Tracking
+* Analytics Dashboard
+* Conversation History Management
 
 ---
 
 ## Key Features
 
 ### AI Admission Chatbot
-*   **Context-Aware Memory:** Retains conversation context for follow-up questions.
-*   **Conversation-Aware Query Rewriting:** Rewrites ambiguous statements (e.g. *"What are its placements?"*) into self-contained search terms using history.
-*   **Source-Grounded Answers:** Restricts responses strictly to uploaded institutional documents to minimize hallucinations.
+
+* Context-aware conversations
+* Follow-up question understanding
+* Conversation-aware query rewriting
+* Retrieval-Augmented Generation (RAG)
+* Knowledge-grounded responses
+* Reduced hallucinations through document-based retrieval
 
 ### Voice Admission Counselor
-*   **Speech-to-Text (STT):** Leverages the browser Web Speech API for real-time speech transcription.
-*   **Indian English Support (`en-IN`):** Optimized locale settings to accurately capture Indian English accents and names.
-*   **Text-to-Speech (TTS):** Plays responses aloud using custom synthesis parameter configurations (friendly, conversational pace and tone).
-*   **Continuous Voice Mode:** A hands-free conversational loop similar to ChatGPT Voice Mode.
-*   **Voice Interruption (Barge-In):** Immediate playback cancellation when the student interrupts or clicks the screen, returning instantly to listening mode.
-*   **Phonetic Transcript Correction:** Configurable mapping layer that corrects university-specific phonetic errors (e.g. *"pusad"* corrected to *"CUSAT"*, *"soy"* corrected to *"SOE"*).
-*   **Silence & Idle State Management:** Smart feedback indicators (e.g., *"I'm listening..."* at 10s, *"Still listening..."* at 30s, and automatic pause at 60s).
+
+* Speech-to-Text using Web Speech API
+* Text-to-Speech responses
+* Continuous Voice Conversation Mode
+* Hands-free conversational experience
+* Indian English speech recognition (`en-IN`)
+* Transcript correction for university-specific terminology
+* Automatic voice replay, mute, and stop controls
+* Female-priority voice selection for natural responses
 
 ### Knowledge Base Management
-*   **Automated Ingestion Pipeline:** Extracts text, chunks paragraphs, and generates embeddings automatically upon upload.
-*   **Embedding Generator:** Integrates with Gemini API to embed chunks into a vector space.
-*   **Database Management:** Tracks chunk size, status, and indexing statistics on the Admin Dashboard.
+
+* Upload university documents
+* Automated text extraction
+* Intelligent document chunking
+* Automatic embedding generation
+* Vector indexing
+* Semantic search support
 
 ### Advanced Retrieval System
-*   **Hybrid Search:** Combines semantic search (vector cosine similarity) and exact keyword search (TF-IDF scoring).
-*   **Course-Aware Routing:** Centralized document keyword map (`COURSE_DOCUMENT_MAP`) to instantly direct queries to relevant course files.
-*   **Dedicated Catalog Retrieval Path:** Recognizes catalog-intent queries and retrieves all chunks of `courses_overview.txt` in narrative order, bypassing vector noise.
-*   **Round-Robin Diversity:** Excludes unrelated course documents to make room for supporting files (fees, hostels, scholarships).
 
-### Lead Management & Analytics
-*   **Lead Identification:** Collects student contact information and course interests.
-*   **Dashboard Visualizations:** Tracks session counts, lead capture rates, and popular queries using interactive charts.
+* Hybrid Retrieval (Semantic + Keyword Search)
+* Course-aware document routing
+* Conversation-aware query rewriting
+* Catalog intent detection
+* Context optimization
+* Retrieval diagnostics
+* Course-specific document prioritization
+
+### Lead Management
+
+* Student enquiry tracking
+* Lead capture forms
+* Lead lifecycle management
+* Conversation-linked leads
+
+### Analytics Dashboard
+
+* Student engagement metrics
+* Query trends
+* Lead statistics
+* Usage analytics
+
+---
+
+## RAG Pipeline
+
+```text
+Student Query
+        ↓
+Query Rewriting
+        ↓
+Intent Detection
+        ↓
+Hybrid Retrieval
+   (Semantic + Keyword)
+        ↓
+Context Assembly
+        ↓
+LLM Generation
+        ↓
+Grounded AI Response
+```
+
+### Retrieval Features
+
+* Vector Search using pgvector
+* Semantic Similarity Search
+* Hybrid Ranking
+* Course-Aware Routing
+* Catalog Query Optimization
+* Conversation Context Preservation
+
+---
+
+## Voice AI Architecture
+
+```text
+Student Speech
+        ↓
+Speech Recognition
+        ↓
+Transcript Correction
+        ↓
+AdmissionAI Chat Pipeline
+        ↓
+RAG Retrieval
+        ↓
+AI Response
+        ↓
+Speech Synthesis
+        ↓
+Audio Response
+```
+
+### Voice Features
+
+* Continuous listening mode
+* Automatic response playback
+* Voice interruption handling
+* Silence timeout recovery
+* Transcript correction engine
+* Natural conversational flow
+
+---
+
+## Major Enhancements Implemented
+
+### Embedding System
+
+* Backfilled embeddings for all knowledge base documents
+* Automatic embedding generation during uploads
+* Complete embedding coverage across indexed documents
+
+### Conversation-Aware Query Rewriting
+
+Examples:
+
+```text
+User:
+Tell me about B.Tech CSE
+
+User:
+What are the placements?
+
+Rewritten Query:
+B.Tech CSE placements
+```
+
+### Course Retrieval Optimization
+
+* COURSE_DOCUMENT_MAP implementation
+* Course synonym expansion
+* Adaptive course routing
+* Noise reduction from unrelated documents
+
+### Catalog Query Optimization
+
+Examples:
+
+```text
+What courses are available?
+List all courses offered by CUSAT
+Show available programs
+```
+
+These queries trigger dedicated catalog retrieval paths to provide complete program listings.
+
+### Voice Counselor Enhancements
+
+* Continuous Voice Conversation Mode
+* Improved speech quality
+* Female-priority voice selection
+* Transcript correction layer
+* Indian English speech recognition optimization
+
+---
+
+## Technology Stack
+
+### Frontend
+
+* React
+* TypeScript
+* Vite
+* Tailwind CSS
+* Shadcn UI
+
+### Backend
+
+* Node.js
+* Express.js
+* TypeScript
+
+### Database
+
+* PostgreSQL
+* Supabase
+* pgvector
+
+### ORM
+
+* Prisma
+
+### AI & RAG
+
+* Groq
+* Google Gemini Embeddings
+* Vector Search
+* Retrieval-Augmented Generation (RAG)
+
+### Deployment
+
+* Vercel
+* Render
+* Supabase
 
 ---
 
@@ -56,121 +237,37 @@ Key capabilities of the platform include:
 
 ```mermaid
 graph TD
-    subgraph Frontend [Student Portal & Admin Dashboard]
-        UI[React / Vite SPA]
-        WS[Web Speech API: SpeechRecognition]
-        SS[Web Speech API: SpeechSynthesis]
-    end
 
-    subgraph Backend [Node.js + Express Server]
-        Ctrl[Chat Controller]
-        QR[Query Rewriter]
-        Ret[Retrieval Layer]
-        DocMap[COURSE_DOCUMENT_MAP & Routing]
-        CatRet[Dedicated Catalog Path]
-    end
+A[Student Portal] --> B[Express Backend]
 
-    subgraph Database [Storage Layer]
-        DB[(PostgreSQL + pgvector)]
-    end
+B --> C[Query Rewriting]
+C --> D[Retrieval Layer]
 
-    subgraph ExternalServices [External AI APIs]
-        Gemini[Google Gemini API]
-        Groq[Groq API Fallback]
-    end
+D --> E[PostgreSQL + pgvector]
+D --> F[Knowledge Base]
 
-    %% Data Flow
-    UI -->|1. User Question| Ctrl
-    WS -->|Speech-to-Text| UI
-    Ctrl -->|2. Rewrite Query| QR
-    QR -->|Generate Embeddings| Gemini
-    Gemini -->|Embeddings| QR
-    QR -->|Standalone Query| Ret
-    Ret -->|Check intent / routing| DocMap
-    DocMap -->|Catalog intent: fetch overview| CatRet
-    CatRet -->|Direct ordered query| DB
-    DocMap -->|General: hybrid semantic search| DB
-    DB -->|Relevant Context Chunks| Ret
-    Ret -->|3. Assemble context| Ctrl
-    Ctrl -->|4. Generate Response| Gemini
-    Gemini -.->|Fallback if Quota Exceeded| Groq
-    Groq -->|Grounded AI Response| Ctrl
-    Ctrl -->|5. JSON API Response| UI
-    UI -->|Audio Playback| SS
+D --> G[Groq LLM]
+
+G --> H[Grounded Response]
+
+H --> A
 ```
 
-### Voice Interaction Flow
+### Voice Layer
+
 ```mermaid
 graph LR
-    subgraph Student
-        S[Student Speaks]
-        H[Student Hears]
-    end
 
-    subgraph Browser API
-        SR[SpeechRecognition en-IN]
-        TCM[Transcript Correction Map]
-        SSy[SpeechSynthesis selectBestVoice]
-    end
+A[Student] --> B[Speech Recognition]
 
-    subgraph Backend Pipeline
-        API[Chat API Endpoint]
-    end
+B --> C[Transcript Correction]
 
-    S --> SR
-    SR -->|Raw Transcript| TCM
-    TCM -->|Cleaned Text: CUSAT, SOE, B.Tech| API
-    API -->|AI Response Text| SSy
-    SSy --> H
+C --> D[AdmissionAI]
+
+D --> E[Speech Synthesis]
+
+E --> A
 ```
-
----
-
-## RAG Architecture Pipeline
-
-1.  **Student Query:** Student types or speaks a question.
-2.  **Query Rewriting:** The chat controller analyzes historical context and rewrites pronoun-heavy follow-up questions into standalone queries.
-3.  **Catalog-Intent Routing:** If the query asks for broad listings (e.g. *"Show all courses"*), it invokes a **Dedicated Catalog Path** that retrieves the full `courses_overview.txt` document in order.
-4.  **Hybrid Retrieval:** Otherwise, it queries the PostgreSQL database by combining Gemini vector embeddings (via pgvector cosine distance) with a localized TF-IDF score.
-5.  **Context Assembly:** Ranks the top chunks, applies document filtering to exclude competing disciplines, and merges them up to the character limit budget (up to 8000 characters for catalogs).
-6.  **LLM Generation:** Sends the context to Gemini 2.5 Flash (falling back automatically to Groq Llama 3.3 if Gemini quota is exceeded) to formulate a grounded response.
-
----
-
-## Recent Major Improvements
-
-### 1. Robust Embedding System
-*   Backfilled embeddings for all historical document chunks.
-*   Updated the document upload endpoint to run a resilient, chunked embedding generator with exponential backoff retries, maintaining 100% embedding coverage.
-
-### 2. Conversational Query Rewriting
-*   Implemented a query rewriting layer that resolves pronouns using history.
-*   Enforced standard format query mapping for specific entities (e.g., MCA, B.Tech IT).
-
-### 3. Course Retrieval Routing
-*   Replaced hardcoded check lists with a scalable `COURSE_DOCUMENT_MAP`.
-*   Prioritizes up to 4 chunks from the target course document and isolates the search from other branch files to keep the context noise-free.
-
-### 4. Dedicated Catalog Path
-*   Configured regex-based catalog intent filters.
-*   Sets up a dedicated database path to fetch the entire `courses_overview.txt` in index order.
-*   Expanded the context budget limit dynamically to 8000 characters for catalog requests.
-
-### 5. Voice counselor Upgrades
-*   Configured continuous voice dialogue mode with automatic microphone re-activation.
-*   Added automatic female-priority English voice selection (`Google UK English Female`, `Microsoft Zira`, etc.).
-*   Developed a line-by-line Markdown parsing cleaner to translate bullet lists, headers, and emphasis tags into natural speech strings.
-
----
-
-## Technology Stack
-
-*   **Frontend:** React (SPA), TypeScript, Vite, Tailwind CSS, Shadcn UI
-*   **Backend:** Node.js, Express.js, TypeScript
-*   **Database:** PostgreSQL, Supabase, pgvector
-*   **ORM:** Prisma
-*   **AI Models & APIs:** Google Gemini 2.5 Flash, Gemini Embeddings, Groq (Llama-3.3-70b-versatile fallback)
-*   **Deployment:** Vercel (Frontend), Render (Backend), Supabase (Database)
 
 ---
 
@@ -178,120 +275,108 @@ graph LR
 
 ```text
 admission-ai-v2/
-├── backend/                       # Express Backend Server
-│   ├── prisma/                    # Prisma DB schema & migrations
-│   │   └── schema.prisma          
-│   ├── src/                       # Source code
-│   │   ├── config/                # Database & ENV configuration
-│   │   ├── controllers/           # Route handler controllers (chat, leads, docs)
-│   │   ├── middleware/            # JWT Auth, request parsers
-│   │   ├── routes/                # Express API endpoints definition
-│   │   ├── services/              # AI Core logic (retrieval, vector search, llm, groq)
-│   │   ├── utils/                 # Response formatters
-│   │   └── scripts/               # Diagnostics & backfill utilities
-│   ├── package.json
-│   └── tsconfig.json
+
+├── backend/
+│   ├── prisma/
+│   ├── src/
+│   │   ├── config/
+│   │   ├── controllers/
+│   │   ├── middleware/
+│   │   ├── routes/
+│   │   ├── services/
+│   │   ├── scripts/
+│   │   └── utils/
+│   └── package.json
 │
-├── src/                           # React Frontend Application
-│   ├── api/                       # API integration services (Axios client)
-│   ├── components/                # Shared UI layouts (soundwaves, mic indicators)
-│   ├── contexts/                  # Auth and Chat State providers
-│   ├── hooks/                     # Custom React hooks
-│   ├── pages/                     # Routed views (StudentPortal, AdminDashboard, Leads)
-│   ├── types/                     # TypeScript definitions
-│   ├── App.tsx                    # React routing entry point
-│   ├── main.tsx                   # DOM attachment
-│   └── index.css                  # Custom Tailwind & voice mode keyframe animation styles
+├── src/
+│   ├── components/
+│   ├── contexts/
+│   ├── hooks/
+│   ├── pages/
+│   ├── api/
+│   ├── types/
+│   └── App.tsx
 │
-├── package.json                   # Root package definitions
-├── tailwind.config.js             # Tailwind design styles
-└── vite.config.ts                 # SPA compiler config
+├── package.json
+├── vite.config.ts
+└── README.md
 ```
 
 ---
 
 ## Screenshots
 
-*Note: Below are visual placeholders for key segments of the application.*
+### Student Portal
 
-*   **Student Portal Interface:** `[Placeholder: Student chat workspace with RAG answers]`
-*   **Voice Counselor Modal:** `[Placeholder: Hands-free voice overlay with bouncing soundwave animations]`
-*   **Admin Dashboard:** `[Placeholder: Knowledge base statistics and document list]`
-*   **Leads Management Panel:** `[Placeholder: Student lead records, courses, and session logs]`
-*   **Analytics Overview:** `[Placeholder: Student interaction query charts and key stats]`
+*Student Portal1.png*
+*Student Portal2.png*
+*Student Portal3.png*
+
+
+### Admin Dashboard
+
+*Admin Dashboard1.png*
+*Admin Dashboard2.png*
+*Admin Dashboard3.png*
+*Admin Dashboard4.png*
+
 
 ---
 
 ## Future Enhancements
 
-*   🌐 **Multi-Language Support:** Expand the voice counselor input to detect regional Indian languages (Hindi, Malayalam, Tamil) using whisper models.
-*   💬 **WhatsApp Channel Integration:** Expose the RAG chatbot to WhatsApp to allow students to query admission updates via SMS.
-*   📞 **Voice Calling Agent:** Integrate Twilio/Vapi to allow students to call the AI counselor directly via telephone.
-*   🔌 **CRM Integrations:** Auto-sync captured student leads to institutional CRMs (like Salesforce or Zoho CRM).
+* Multi-language support
+* WhatsApp integration
+* AI phone-call admission counselor
+* Advanced analytics and reporting
+* University CRM integrations
+* Multi-university support
 
 ---
 
 ## Skills Demonstrated
 
-*   **RAG Architecture:** Design and deployment of hybrid lexical (TF-IDF) & semantic (pgvector) indexers.
-*   **Voice Interface Engineering:** Implement hands-free browser loops, self-echo gating, speech-synthesis filters, and phonetic correction.
-*   **Database Design:** Manage transactional data alongside vector spaces using PostgreSQL, Supabase, and Prisma.
-*   **API Design:** Build scalable authentication, file uploads, and stream-ready endpoints in Node.js.
-*   **DevOps & Error Handling:** Implement resilient external API rate limit fallbacks (Gemini ➔ Groq).
+### AI & Machine Learning
+
+* Retrieval-Augmented Generation (RAG)
+* Semantic Search
+* Vector Databases
+* Embedding Generation
+* Prompt Engineering
+
+### Full Stack Development
+
+* React
+* TypeScript
+* Express.js
+* Node.js
+* REST APIs
+
+### Database Engineering
+
+* PostgreSQL
+* Supabase
+* Prisma ORM
+* pgvector
+
+### Voice AI
+
+* Speech Recognition
+* Speech Synthesis
+* Conversational AI
+* Voice UX Design
+
+### Software Engineering
+
+* System Design
+* API Development
+* Database Design
+* Error Handling
+* Performance Optimization
+* Deployment & DevOps
 
 ---
 
-## Local Installation & Setup
+## Impact
 
-### Clone the Repository
-```bash
-git clone https://github.com/your-username/admission-ai-v2.git
-cd admission-ai-v2
-```
-
-### Backend Installation
-1. Navigate to the backend folder:
-   ```bash
-   cd backend
-   ```
-2. Install packages:
-   ```bash
-   npm install
-   ```
-3. Set up your `.env` file in the `backend/` directory:
-   ```env
-   PORT=5000
-   DATABASE_URL="postgresql://<username>:<password>@<host>:<port>/<dbname>?pgconnector=true"
-   DIRECT_URL="postgresql://<username>:<password>@<host>:<port>/<dbname>"
-   GEMINI_API_KEY="your-google-gemini-api-key"
-   GEMINI_MODEL="gemini-2.5-flash"
-   GROQ_API_KEY="your-groq-api-key"
-   GROQ_MODEL="llama-3.3-70b-versatile"
-   JWT_SECRET="your-jwt-auth-secret-key"
-   RETRIEVAL_SCORE_THRESHOLD=0.20
-   MAX_CHUNKS_PER_DOC=4
-   ```
-4. Setup database schemas:
-   ```bash
-   npx prisma generate
-   npx prisma db push
-   ```
-5. Run the server:
-   ```bash
-   npm run dev
-   ```
-
-### Frontend Installation
-1. Navigate back to the root folder (where the frontend files reside):
-   ```bash
-   cd ..
-   ```
-2. Install packages:
-   ```bash
-   npm install
-   ```
-3. Run the development build:
-   ```bash
-   npm run dev
-   ```
-4. Access the Student Portal in your browser at `http://localhost:5173`.
+AdmissionAI demonstrates how modern AI, vector search, and voice technologies can be combined to create a scalable digital admission counselor capable of providing accurate, context-aware, and conversational assistance to prospective university students.
